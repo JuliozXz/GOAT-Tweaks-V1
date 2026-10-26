@@ -1,6 +1,6 @@
 # Referências técnicas e critérios de implementação
 
-Consulta: 26 de outubro de 2026. Implementação própria em PowerShell/WPF. Os projetos abaixo servem como referências de organização e funcionalidades; o aplicativo não baixa nem executa seus scripts e não incorpora seu código.
+Consulta: 26 de outubro de 2026. Implementação própria em PowerShell/WPF. Além das funções nativas do GOAT, a versão 2.3 apresenta quatro bibliotecas com arquivos, recursos e releases dos projetos abaixo. Downloads e abertura de aplicativos ocorrem somente após ação do usuário, a partir da origem oficial e com verificação de integridade. Os programas externos executam em processos próprios; suas alterações não são cobertas pelo diário de reversão nativo do GOAT.
 
 ## Projetos citados na especificação
 

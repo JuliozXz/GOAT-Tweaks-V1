@@ -1,8 +1,8 @@
-﻿# GOAT Tweaks v2.2 - Windows PowerShell 5.1 / WPF presentation layer.
+﻿# GOAT Tweaks v2.3 - Windows PowerShell 5.1 / WPF presentation layer.
 # The UI thread only renders completed worker results. System operations run in isolated runspaces.
 
 function New-GoatUiText {
-    param([string]$Text, [string]$Color = '#94A3B8', [double]$Size = 11)
+    param([string]$Text, [string]$Color = '#A0A0A0', [double]$Size = 11)
     $block = New-Object System.Windows.Controls.TextBlock
     $block.Text = $Text
     $block.Foreground = [System.Windows.Media.BrushConverter]::new().ConvertFromString($Color)
@@ -14,7 +14,7 @@ function New-GoatUiText {
 function Set-GoatUiStatus {
     param([string]$Text, [bool]$ErrorState = $false)
     $script:GoatUi.Controls.StatusText.Text = $Text
-    $color = if ($ErrorState) { '#F29DB8' } else { '#94A3B8' }
+    $color = if ($ErrorState) { '#DA8D87' } else { '#A0A0A0' }
     $script:GoatUi.Controls.StatusText.Foreground = [System.Windows.Media.BrushConverter]::new().ConvertFromString($color)
 }
 
@@ -26,6 +26,7 @@ function Update-GoatUiSelection {
     $ui.Controls.ApplyButton.IsEnabled = $canApply
     $ui.Controls.RestoreButton.IsEnabled = ($null -ne $ui.Scan -and -not $ui.Worker -and ($ui.Admin -or $ui.Demo))
     $ui.Controls.RescanButton.IsEnabled = (-not $ui.Worker)
+    if ($ui.Controls.ContainsKey('CatalogRunButton')) { Update-GoatUiCatalogActions }
 }
 
 function Update-GoatUiTweaks {
@@ -42,18 +43,18 @@ function Update-GoatUiTweaks {
         $check.IsChecked = ($tweak.Recommended -and $check.IsEnabled)
         if ($ui.Selections.ContainsKey([string]$tweak.Id)) { $check.IsChecked = ($ui.Selections[[string]$tweak.Id] -and $check.IsEnabled) }
         $stack = New-Object System.Windows.Controls.StackPanel
-        $title = New-GoatUiText -Text $tweak.Title -Color '#DDE5F3' -Size 11
+        $title = New-GoatUiText -Text $tweak.Title -Color '#F3F3F3' -Size 11
         $title.FontWeight = 'SemiBold'
         [void]$stack.Children.Add($title)
         $detail = [string]$tweak.Description
         if (-not $tweak.Available -and $tweak.UnavailableReason) { $detail = [string]$tweak.UnavailableReason }
-        $description = New-GoatUiText -Text $detail -Color '#74849D' -Size 10
+        $description = New-GoatUiText -Text $detail -Color '#A0A0A0' -Size 10
         $description.Margin = '0,4,0,0'
         [void]$stack.Children.Add($description)
         $meta = @($tweak.Risk)
         if ($tweak.RequiresRestart) { $meta += 'reinício necessário' }
         if ($tweak.State -eq 'Aplicado') { $meta += 'já aplicado' }
-        $label = New-GoatUiText -Text ($meta -join ' · ') -Color $(if ($tweak.Risk -eq 'Moderado') { '#CBA15D' } else { '#668B80' }) -Size 9
+        $label = New-GoatUiText -Text ($meta -join ' · ') -Color $(if ($tweak.Risk -eq 'Moderado') { '#D4AE69' } else { '#A0A0A0' }) -Size 9
         $label.Margin = '0,4,0,0'
         [void]$stack.Children.Add($label)
         $check.Content = $stack
@@ -76,13 +77,13 @@ function Update-GoatUiTweaks {
 function Add-GoatUiFinding {
     param($Finding)
     $border = New-Object System.Windows.Controls.Border
-    $border.Background = [System.Windows.Media.BrushConverter]::new().ConvertFromString('#0F1420')
+    $border.Background = [System.Windows.Media.BrushConverter]::new().ConvertFromString('#101010')
     $border.CornerRadius = New-Object System.Windows.CornerRadius 7
     $border.Padding = '12'
     $border.Margin = '0,0,0,9'
     $stack = New-Object System.Windows.Controls.StackPanel
     $severity = [string]$Finding.Severity
-    $color = if ($severity -match 'Warning|Aviso|Aten|Moderad') { '#E1B776' } elseif ($severity -match 'Error|Erro|Cr.tic') { '#F29DB8' } else { '#BBA0E3' }
+    $color = if ($severity -match 'Warning|Aviso|Aten|Moderad') { '#D4AE69' } elseif ($severity -match 'Error|Erro|Cr.tic') { '#DA8D87' } else { '#CFB579' }
     $title = New-GoatUiText -Text ('{0}  /  {1}' -f $Finding.Category, $Finding.Title) -Color $color -Size 12
     $title.FontWeight = 'SemiBold'
     [void]$stack.Children.Add($title)
@@ -98,12 +99,21 @@ function Update-GoatUiFindings {
     $ui.Controls.FindingsPanel.Children.Clear()
     if (-not $ui.Scan) { return }
     if ($ui.Filter -eq 'CPU') {
-        Add-GoatUiFinding -Finding ([pscustomobject]@{ Category = 'CPU'; Severity = 'Info'; Title = [string]$ui.Scan.CPU.Name; Detail = ('{0} núcleos · {1} threads · plano de energia: {2}' -f $ui.Scan.CPU.Cores, $ui.Scan.CPU.Threads, $ui.Scan.Power.ActiveSchemeName) })
+        $architectureReading=$null
+        $readings=$ui.Scan.AdvancedState.Readings
+        if ($readings -is [Collections.IDictionary]) { $architectureReading=$readings['cpu-architecture'] }
+        elseif ($readings) { $property=$readings.PSObject.Properties['cpu-architecture'];if($property){$architectureReading=$property.Value} }
+        $architecture=if($architectureReading -and $architectureReading.Text){' · '+[string]$architectureReading.Text}else{''}
+        Add-GoatUiFinding -Finding ([pscustomobject]@{ Category = 'CPU'; Severity = 'Info'; Title = [string]$ui.Scan.CPU.Name; Detail = (('{0} núcleos · {1} threads · plano de energia: {2}' -f $ui.Scan.CPU.Cores, $ui.Scan.CPU.Threads, $ui.Scan.Power.ActiveSchemeName)+$architecture) })
     }
     if ($ui.Filter -eq 'GPU') {
         foreach ($gpu in @($ui.Scan.GPU)) {
             Add-GoatUiFinding -Finding ([pscustomobject]@{ Category = 'GPU'; Severity = 'Info'; Title = [string]$gpu.Name; Detail = ('Driver: {0} · prioridade de interrupção informada: {1}' -f $gpu.DriverVersion, $gpu.InterruptPriority) })
         }
+    }
+    if ($ui.Filter -eq 'RAM') {
+        $memory=$ui.Scan.Memory
+        Add-GoatUiFinding -Finding ([pscustomobject]@{ Category='RAM'; Severity='Info'; Title='Memória física detectada'; Detail=('{0} GB totais · {1} GB disponíveis · velocidade informada pelo firmware: {2} MT/s' -f $memory.TotalGB,$memory.AvailableGB,$memory.SpeedMHz) })
     }
     if ($ui.Filter -eq 'BIOS') {
         $board = $ui.Scan.Motherboard
@@ -115,7 +125,7 @@ function Update-GoatUiFindings {
         }
     }
     $findings = @($ui.Scan.Findings | Where-Object {
-        $ui.Filter -eq 'Todos' -or $ui.Filter -eq 'Jogo' -or $_.Category -eq $ui.Filter -or ($ui.Filter -eq 'Sistema' -and $_.Category -eq 'SO') -or ($ui.Filter -eq 'BIOS' -and $_.Category -match 'BIOS|Placa')
+        $ui.Filter -eq 'Todos' -or $ui.Filter -eq 'Jogo' -or $_.Category -eq $ui.Filter -or ($ui.Filter -eq 'RAM' -and $_.Title -match 'mem.ria|RAM') -or ($ui.Filter -eq 'Sistema' -and $_.Category -eq 'SO') -or ($ui.Filter -eq 'BIOS' -and $_.Category -match 'BIOS|Placa')
     })
     foreach ($finding in $findings) { Add-GoatUiFinding -Finding $finding }
     if ($findings.Count -eq 0) {
@@ -128,6 +138,95 @@ function Update-GoatUiFindings {
     }
 }
 
+function Test-GoatRecommendationSourceUrl {
+    param([string]$Url)
+    $uri=$null
+    return ([uri]::TryCreate($Url,[UriKind]::Absolute,[ref]$uri) -and $uri.Scheme -eq 'https' -and $uri.IsDefaultPort -and -not $uri.UserInfo -and $uri.DnsSafeHost -in @('github.com','raw.githubusercontent.com','learn.microsoft.com','devblogs.microsoft.com'))
+}
+
+function Update-GoatUiRecommendations {
+    $ui=$script:GoatUi
+    $ui.Controls.RecommendationsPanel.Children.Clear()
+    $ui.VisibleRecommendations=@()
+    if (-not $ui.Scan) { return }
+    $recommendations=@($ui.Scan.Recommendations | Where-Object {
+        $ui.Filter -eq 'Todos' -or $ui.Filter -eq 'Jogo' -or $_.Category -eq $ui.Filter
+    })
+    $ui.VisibleRecommendations=$recommendations
+    $ui.Controls.RecommendationCount.Text='{0} análises nesta área' -f $recommendations.Count
+    foreach ($recommendation in $recommendations) {
+        $card=New-Object System.Windows.Controls.Border
+        $card.Background=[System.Windows.Media.BrushConverter]::new().ConvertFromString('#101010')
+        $card.BorderBrush=[System.Windows.Media.BrushConverter]::new().ConvertFromString('#292929')
+        $card.BorderThickness='1';$card.CornerRadius='8';$card.Padding='15';$card.Margin='0,0,0,11'
+        $content=New-Object System.Windows.Controls.StackPanel
+        $header=New-Object System.Windows.Controls.Grid
+        $column=New-Object System.Windows.Controls.ColumnDefinition
+        [void]$header.ColumnDefinitions.Add($column)
+        $column=New-Object System.Windows.Controls.ColumnDefinition
+        $column.Width='Auto'
+        [void]$header.ColumnDefinitions.Add($column)
+        $title=New-GoatUiText -Text ('{0}  /  {1}' -f $recommendation.Category,$recommendation.Title) -Color '#EBEBEB' -Size 12
+        $title.FontWeight='SemiBold';$title.Margin='0,0,14,0'
+        [void]$header.Children.Add($title)
+        $badge=New-Object System.Windows.Controls.Border
+        $badge.CornerRadius='4';$badge.Padding='8,4';$badge.VerticalAlignment='Top'
+        $badge.Background=[System.Windows.Media.BrushConverter]::new().ConvertFromString('#242018')
+        $statusColor=switch ([string]$recommendation.Status) {
+            'Recomendado' {'#E4B95B'}
+            'Configurado' {'#CACACA'}
+            'Revisão manual' {'#C7AB73'}
+            default {'#858585'}
+        }
+        $badge.Child=New-GoatUiText -Text ([string]$recommendation.Status) -Color $statusColor -Size 10
+        [System.Windows.Controls.Grid]::SetColumn($badge,1)
+        [void]$header.Children.Add($badge)
+        [void]$content.Children.Add($header)
+        $current=New-GoatUiText -Text ('Estado atual: '+[string]$recommendation.CurrentState) -Color '#B4B4B4' -Size 11
+        $current.Margin='0,9,0,0';[void]$content.Children.Add($current)
+        $detail=New-GoatUiText -Text ([string]$recommendation.Detail) -Color '#909090' -Size 11
+        $detail.Margin='0,6,0,0';[void]$content.Children.Add($detail)
+        if ($recommendation.Conflict) {
+            $conflict=New-GoatUiText -Text 'Fontes divergentes · compare a justificativa e valide sob a mesma carga.' -Color '#D2A46B' -Size 10
+            $conflict.Margin='0,9,0,0';[void]$content.Children.Add($conflict)
+        }
+        $native=@($ui.Tweaks | Where-Object Id -eq $recommendation.ActionId)
+        $metadata='Risco: '+[string]$recommendation.Risk
+        if ($recommendation.ActionId -and $native.Count -gt 0) { $metadata+=' · ajuste disponível no checklist acima' }
+        $risk=New-GoatUiText -Text $metadata -Color '#777777' -Size 10
+        $risk.Margin='0,9,0,0';[void]$content.Children.Add($risk)
+        $sources=New-Object System.Windows.Controls.WrapPanel
+        $sources.Margin='0,9,0,0'
+        foreach ($source in @($recommendation.Sources)) {
+            $sourceName=if ($ui.Repositories.ContainsKey([string]$source.RepositoryId)) { [string]$ui.Repositories[[string]$source.RepositoryId].Name } else { [string]$source.RepositoryId }
+            if (Test-GoatRecommendationSourceUrl -Url ([string]$source.Url)) {
+                switch (([uri]$source.Url).DnsSafeHost) {
+                    'learn.microsoft.com' {$sourceName='Microsoft Learn'}
+                    'devblogs.microsoft.com' {$sourceName='Microsoft DevBlogs'}
+                }
+            }
+            $link=New-Object System.Windows.Controls.Button
+            $link.Content=$sourceName+' ↗';$link.Tag=[string]$source.Url
+            $link.FontSize=10;$link.Padding='9,5';$link.Margin='0,0,7,4'
+            $link.Background=[System.Windows.Media.BrushConverter]::new().ConvertFromString('#1A1915')
+            $link.Foreground=[System.Windows.Media.BrushConverter]::new().ConvertFromString('#C4AB77')
+            $link.ToolTip=('{0} · {1}' -f $source.Stance,$source.Note)
+            $link.IsEnabled=Test-GoatRecommendationSourceUrl -Url ([string]$source.Url)
+            $link.Add_Click({
+                param($sender,$eventArgs)
+                if (Test-GoatRecommendationSourceUrl -Url ([string]$sender.Tag)) { Open-GoatUiSourceUrl -Url ([string]$sender.Tag) }
+            })
+            [void]$sources.Children.Add($link)
+        }
+        [void]$content.Children.Add($sources)
+        $card.Child=$content
+        [void]$ui.Controls.RecommendationsPanel.Children.Add($card)
+    }
+    if ($recommendations.Count -eq 0) {
+        [void]$ui.Controls.RecommendationsPanel.Children.Add((New-GoatUiText -Text 'Não há recomendações cruzadas disponíveis para esta área nesta leitura.' -Size 11))
+    }
+}
+
 function Set-GoatUiNavigation {
     param([string]$Page)
     $ui = $script:GoatUi
@@ -137,10 +236,15 @@ function Set-GoatUiNavigation {
         Game = @('Jogo', 'Modo Jogo GOAT', 'Revise os ajustes disponíveis antes de iniciar a sessão de jogo.', 'Perfil para jogos')
         CPU = @('CPU', 'Processador', 'Topologia, utilização e energia com os limites de cada plataforma.', 'Ajustes de CPU')
         GPU = @('GPU', 'Placa de vídeo', 'Drivers, modo de interrupção e opções do agendador gráfico.', 'Ajustes de GPU')
+        RAM = @('RAM', 'Memória RAM', 'Capacidade, disponibilidade e compressão de memória com contexto das quatro referências.', 'Ajustes de memória')
         BIOS = @('BIOS', 'Placa-mãe & BIOS', 'Identificação da plataforma e itens que exigem verificação no firmware.', 'Plataforma & timers')
         Network = @('Rede', 'Rede & conectividade', 'Adaptadores detectados e configuração da pilha de rede.', 'Ajustes de rede')
         System = @('Sistema', 'Debloat & sistema', 'Configurações reversíveis e comportamento do Windows.', 'Ajustes do sistema')
         Drivers = @('Drivers', 'Drivers & ferramentas', 'Inventário local e acesso às páginas oficiais da bancada.', 'Ferramentas')
+        Winutil = @('Biblioteca', 'Winutil', 'Arquivos originais, recursos e aplicativo oficial do Chris Titus Tech.', 'Winutil')
+        WinSux = @('Biblioteca', 'WinSux', 'A árvore original de arquivos do projeto FR33THYFR33THY.', 'WinSux')
+        Ultimate = @('Biblioteca', 'Ultimate', 'O guia de otimização original, organizado pelas pastas do projeto.', 'Ultimate')
+        RyTuneX = @('Biblioteca', 'RyTuneX', 'Código, recursos, releases e página oficial do aplicativo RyTuneX.', 'RyTuneX')
     }
     $settings = $map[$Page]
     $ui.Filter = $settings[0]
@@ -148,26 +252,173 @@ function Set-GoatUiNavigation {
     if ($ui.Scan) { $ui.Controls.HeaderSubtitle.Text = $settings[2] }
     $ui.Controls.OptimizerTitle.Text = $settings[3]
     $isDrivers = ($Page -eq 'Drivers')
+    $isCatalog = $Page -in @('Winutil','WinSux','Ultimate','RyTuneX')
+    $ui.Controls.CatalogSection.Visibility = $(if ($isCatalog) { 'Visible' } else { 'Collapsed' })
     $ui.Controls.DriversSection.Visibility = $(if ($isDrivers) { 'Visible' } else { 'Collapsed' })
-    $ui.Controls.DashboardGrid.Visibility = $(if ($isDrivers) { 'Collapsed' } else { 'Visible' })
-    $ui.Controls.ActionsSection.Visibility = $(if ($isDrivers) { 'Collapsed' } else { 'Visible' })
+    $ui.Controls.DashboardGrid.Visibility = $(if ($isDrivers -or $isCatalog) { 'Collapsed' } else { 'Visible' })
+    $ui.Controls.ActionsSection.Visibility = $(if ($isDrivers -or $isCatalog) { 'Collapsed' } else { 'Visible' })
     $ui.Controls.UpdatesSection.Visibility = $(if ($Page -eq 'Home') { 'Visible' } else { 'Collapsed' })
-    $ui.Controls.CategorySection.Visibility = $(if ($isDrivers -or -not $ui.Scan) { 'Collapsed' } else { 'Visible' })
-    $ui.Controls.CategoryTitle.Text = $(if ($Page -eq 'Home') { 'Diagnóstico da máquina' } else { 'O que o scanner encontrou' })
+    $ui.Controls.CategorySection.Visibility = $(if ($isCatalog -or -not $ui.Scan) { 'Collapsed' } else { 'Visible' })
+    $ui.Controls.CategoryTitle.Text = $(if ($Page -eq 'Home') { 'Recomendações para esta máquina' } else { 'Recomendações por área' })
     $descriptions = @{
         Home = 'Constatações baseadas nas consultas disponíveis. Gargalos e latência exigem medições sob carga.'
         Game = 'A seleção usa o estado encontrado no Windows. Compare desempenho e estabilidade antes e depois.'
         CPU = 'C-States, afinidade e políticas de núcleos dependem do firmware e da carga. Não são alterados automaticamente.'
         GPU = 'MSI é informado a partir do Registro. Suporte a ReBAR e benefícios do HAGS exigem verificação do driver, firmware e jogo.'
+        RAM = 'Compare o estado atual com as referências. Compressão e paginação dependem da carga; a aplicação de qualquer ajuste exige seleção e revisão.'
         BIOS = 'Nenhuma configuração de BIOS, HPET, BCD ou resolução de timer é modificada automaticamente.'
         Network = 'Buffers e offloads precisam de medição no adaptador e na rede utilizados. Não há ganho universal de latência.'
         System = 'As alterações disponíveis preservam os valores capturados para uma restauração posterior.'
+        Drivers = 'Compare o inventário com as referências e a documentação do fabricante. Uma versão instalada, isoladamente, não comprova que há atualização disponível.'
     }
     if ($descriptions.ContainsKey($Page)) { $ui.Controls.CategoryDescription.Text = $descriptions[$Page] }
     if ($Page -eq 'CPU') { $ui.Controls.CpuTab.IsChecked = $true }
     if ($Page -eq 'GPU') { $ui.Controls.GpuTab.IsChecked = $true }
-    if (-not $isDrivers) { Update-GoatUiTweaks; Update-GoatUiFindings }
+    if ($Page -eq 'RAM') { $ui.Controls.RamTab.IsChecked = $true }
+    if ($isCatalog) { Set-GoatUiCatalog -RepositoryId $Page.ToLowerInvariant() }
+    else {
+        if (-not $isDrivers) { Update-GoatUiTweaks }
+        Update-GoatUiRecommendations
+        Update-GoatUiFindings
+    }
     $ui.Controls.MainScroll.ScrollToTop()
+}
+
+function Set-GoatUiCatalog {
+    param([string]$RepositoryId)
+    $ui = $script:GoatUi
+    $repo = $ui.Repositories[$RepositoryId]
+    if (-not $repo) {
+        $ui.Controls.CatalogTitle.Text = 'Catálogo indisponível'
+        $ui.Controls.CatalogDescription.Text = 'O catálogo local deste projeto não foi carregado. Confira os arquivos da distribuição.'
+        $ui.Controls.CatalogGrid.ItemsSource = [object[]]@()
+        $ui.Controls.CatalogPrimaryButton.IsEnabled = $false
+        return
+    }
+    if ($ui.CurrentRepository -and $ui.CurrentRepository.Id -eq $RepositoryId) { Update-GoatUiCatalogActions; return }
+    $ui.CatalogRefreshing = $true
+    try {
+        $ui.CurrentRepository = $repo
+        $ui.Controls.CatalogTitle.Text = [string]$repo.Name
+        $ui.Controls.CatalogDescription.Text = [string]$repo.Description
+        $ui.Controls.CatalogRevision.Text = 'Revisão {0} · catálogo {1} · conteúdo original de {2}/{3}' -f $repo.CommitShort, $repo.UpdatedAt, $repo.Owner, $repo.Repository
+        $ui.Controls.CatalogSearchBox.Text = ''
+        $ui.Controls.CatalogGroupFilter.ItemsSource = [string[]](@('Todas as pastas') + @($repo.Items | Select-Object -ExpandProperty Group -Unique | Sort-Object))
+        $ui.Controls.CatalogKindFilter.ItemsSource = [string[]](@('Todos os tipos') + @($repo.Items | Select-Object -ExpandProperty Kind -Unique | Sort-Object))
+        $ui.Controls.CatalogGroupFilter.SelectedIndex = 0
+        $ui.Controls.CatalogKindFilter.SelectedIndex = 0
+        $ui.PrimaryItem = @($repo.Items | Where-Object { $_.Id -eq $repo.PrimaryItemId } | Select-Object -First 1)[0]
+        $ui.Controls.CatalogPrimaryButton.Content = $(if ($ui.PrimaryItem) { [string]$ui.PrimaryItem.RunLabel + ' ↗' } else { 'Ver projeto oficial ↗' })
+        $ui.Controls.CatalogOperationStatus.Text = 'Catálogo completo: arquivos, recursos e releases. Nada é executado ao abrir esta página.'
+        $ui.Controls.CatalogOpenFolderButton.Visibility = 'Collapsed'
+    } finally { $ui.CatalogRefreshing = $false }
+    Update-GoatUiCatalogFilter
+}
+
+function Update-GoatUiCatalogColumns {
+    $grid=$script:GoatUi.Controls.CatalogGrid
+    if ($grid.ActualWidth -lt 340 -or $grid.Columns.Count -ne 3) { return }
+    # Explicit viewport widths avoid stale star-column measurements when the
+    # virtualized table is hidden, filtered and reopened inside the page scroller.
+    # Only rows are virtualized: all three columns always remain visible.
+    $available=[Math]::Floor($grid.ActualWidth - 18)
+    $kindWidth=92
+    $nameWidth=[Math]::Floor(($available-$kindWidth)*0.56)
+    $groupWidth=$available-$kindWidth-$nameWidth
+    $grid.Columns[0].Width=New-Object System.Windows.Controls.DataGridLength $nameWidth
+    $grid.Columns[1].Width=New-Object System.Windows.Controls.DataGridLength $kindWidth
+    $grid.Columns[2].Width=New-Object System.Windows.Controls.DataGridLength $groupWidth
+}
+
+function Update-GoatUiCatalogFilter {
+    $ui = $script:GoatUi
+    if ($ui.CatalogRefreshing -or -not $ui.CurrentRepository) { return }
+    $search = $ui.Controls.CatalogSearchBox.Text.Trim()
+    $group = [string]$ui.Controls.CatalogGroupFilter.SelectedItem
+    $kind = [string]$ui.Controls.CatalogKindFilter.SelectedItem
+    $allItems = @($ui.CurrentRepository.Items)
+    $visible = @($allItems | Where-Object {
+        ($group -eq '' -or $group -eq 'Todas as pastas' -or $_.Group -eq $group) -and
+        ($kind -eq '' -or $kind -eq 'Todos os tipos' -or $_.Kind -eq $kind) -and
+        ($search -eq '' -or ('{0} {1} {2} {3} {4}' -f $_.Name, $_.Path, $_.Group, $_.Kind, $_.Description).IndexOf($search, [StringComparison]::OrdinalIgnoreCase) -ge 0)
+    } | Sort-Object Group,Name)
+    $ui.Controls.CatalogGrid.ItemsSource = [object[]]$visible
+    Update-GoatUiCatalogColumns
+    $ui.Controls.CatalogCount.Text = '{0} de {1} itens · arquivos + recursos + releases' -f $visible.Count, $allItems.Count
+    if ($visible.Count -gt 0) { $ui.Controls.CatalogGrid.SelectedIndex = 0 }
+    else { Update-GoatUiCatalogDetails }
+    Update-GoatUiCatalogActions
+}
+
+function Update-GoatUiCatalogDetails {
+    $ui = $script:GoatUi
+    $item = $ui.Controls.CatalogGrid.SelectedItem
+    $ui.CatalogItem = $item
+    $ui.Controls.CatalogDetailsScroll.ScrollToTop()
+    if (-not $item) {
+        $ui.Controls.CatalogItemName.Text = 'Nenhum item selecionado'
+        $ui.Controls.CatalogItemKind.Text = ''
+        $ui.Controls.CatalogItemPath.Text = ''
+        $ui.Controls.CatalogItemDescription.Text = 'Altere a busca ou os filtros para encontrar os arquivos e recursos do projeto.'
+        $ui.Controls.CatalogItemWarning.Text = 'A lista mostra todos os tipos de conteúdo quando os filtros estão em Todos.'
+        $ui.Controls.CatalogItemHash.Text = ''
+        Update-GoatUiCatalogActions
+        return
+    }
+    $ui.Controls.CatalogItemName.Text = [string]$item.Name
+    $size = if ($null -ne $item.Size) { if ([double]$item.Size -ge 1MB) { '{0:N1} MB' -f ([double]$item.Size / 1MB) } elseif ([double]$item.Size -ge 1KB) { '{0:N1} KB' -f ([double]$item.Size / 1KB) } else { '{0} bytes' -f $item.Size } } else { 'tamanho não informado' }
+    $ui.Controls.CatalogItemKind.Text = '{0} · {1}' -f $item.Kind, $size
+    $ui.Controls.CatalogItemPath.Text = [string]$item.Path
+    $ui.Controls.CatalogItemDescription.Text = $(if ($item.Description) { [string]$item.Description } else { 'Arquivo original do projeto. Consulte o conteúdo e as instruções do autor.' })
+    $ui.Controls.CatalogItemWarning.Text = $(if ($item.Warning) { [string]$item.Warning } else { 'Revise o conteúdo original e as instruções do autor antes de executar este item.' })
+    $ui.Controls.CatalogItemHash.Text = $(if ($item.Sha256) { 'SHA-256: ' + [string]$item.Sha256 } elseif ($item.Sha) { 'Git blob: ' + [string]$item.Sha } else { 'Origem: ' + [string]$item.Operation })
+    $ui.Controls.CatalogRunButton.Content = $(if ($item.RunLabel) { [string]$item.RunLabel } else { 'Execução não disponível' })
+    Update-GoatUiCatalogActions
+}
+
+function Update-GoatUiCatalogActions {
+    $ui = $script:GoatUi
+    $item = $ui.CatalogItem
+    $busy = [bool]$ui.Worker
+    $ui.Controls.CatalogViewSourceButton.IsEnabled = [bool]($item -and $item.SourceUrl)
+    $ui.Controls.CatalogDownloadButton.IsEnabled = [bool]($item -and $item.Operation -in @('RepositoryFile','ReleaseAsset') -and $item.DownloadUrl -and -not $busy)
+    $ui.Controls.CatalogRunButton.IsEnabled = [bool]($item -and $item.CanRun -and -not $busy -and ($ui.Admin -or $ui.Demo -or $item.LaunchType -eq 'uri'))
+    $primary = $ui.PrimaryItem
+    $ui.Controls.CatalogPrimaryButton.IsEnabled = [bool]($ui.CurrentRepository -and -not $busy -and (-not $primary -or ($primary.CanRun -and ($ui.Admin -or $ui.Demo -or $primary.LaunchType -eq 'uri'))))
+    $ui.Controls.CatalogPrimaryButton.ToolTip = $(if ($primary -and -not $ui.Admin -and -not $ui.Demo -and $primary.LaunchType -ne 'uri') { 'Abra o GOAT como administrador para executar esta ferramenta externa.' } elseif ($primary) { [string]$primary.Warning } else { 'Abrir o repositório oficial do projeto.' })
+    $ui.Controls.CatalogRepositoryButton.IsEnabled = [bool]$ui.CurrentRepository
+    $ui.Controls.CatalogLicenseButton.IsEnabled = [bool]($ui.CurrentRepository -and $ui.CurrentRepository.LicenseUrl)
+    if ($item -and $item.CanRun -and -not $ui.Admin -and -not $ui.Demo -and $item.LaunchType -ne 'uri') {
+        $ui.Controls.CatalogRunButton.ToolTip = 'Abra o GOAT como administrador para executar ferramentas externas.'
+    } else { $ui.Controls.CatalogRunButton.ToolTip = [string]$item.Warning }
+}
+
+function Open-GoatUiSourceUrl {
+    param([string]$Url)
+    if ([string]::IsNullOrWhiteSpace($Url)) { return }
+    try { Start-Process -FilePath $Url -ErrorAction Stop | Out-Null }
+    catch { Set-GoatUiStatus -Text ('Não foi possível abrir a origem: ' + $_.Exception.Message) -ErrorState $true }
+}
+
+function Invoke-GoatUiExternalAction {
+    param([ValidateSet('Download','Run')][string]$Action, $Item)
+    $ui = $script:GoatUi
+    if ($ui.Worker -or -not $Item -or -not $ui.CurrentRepository) { return }
+    if ($Action -eq 'Run' -and -not $Item.CanRun) { return }
+    if ($Action -eq 'Run' -and $Item.LaunchType -ne 'uri' -and -not $ui.Demo) {
+        $review = @(
+            ('Projeto: {0}' -f $ui.CurrentRepository.Name),
+            ('Item: {0}' -f $Item.Path),
+            '', [string]$Item.Warning, '',
+            'Este comando abre o arquivo original em um processo externo com privilégios de administrador.',
+            'Será exigido um ponto de restauração e a operação será registrada. Alterações da ferramenta externa não são revertidas pelo botão Restaurar do GOAT.',
+            'Leia o arquivo e as instruções do autor. A ferramenta pode reiniciar o PC ou exigir etapas adicionais.',
+            '', 'Executar este item agora?'
+        ) -join "`r`n"
+        $answer = [System.Windows.MessageBox]::Show($ui.Window, $review, ('Revisar execução · ' + $Item.Name), [System.Windows.MessageBoxButton]::YesNo, [System.Windows.MessageBoxImage]::Warning, [System.Windows.MessageBoxResult]::No)
+        if ($answer -ne [System.Windows.MessageBoxResult]::Yes) { return }
+    }
+    Start-GoatUiWorker -Kind Integration -RepositoryId $ui.CurrentRepository.Id -ItemId $Item.Id -ExternalAction $Action
 }
 
 function Update-GoatUiChart {
@@ -238,25 +489,34 @@ function Update-GoatUiWindowScale {
 }
 
 function Start-GoatUiWorker {
-    param([ValidateSet('Scan','Apply','Restore','Telemetry')] [string]$Kind, [string[]]$Ids = @())
+    param([ValidateSet('Scan','Apply','Restore','Telemetry','Integration')] [string]$Kind, [string[]]$Ids = @(), [string]$RepositoryId, [string]$ItemId, [string]$ExternalAction)
     $ui = $script:GoatUi
     if ($Kind -eq 'Telemetry' -and $ui.TelemetryWorker) { return }
     if ($Kind -ne 'Telemetry' -and $ui.Worker) { return }
     $workerSource = @'
-param($goatWorkerDemo, $goatWorkerKind, $goatWorkerIds, $goatWorkerScan, $goatWorkerProgress)
+param($goatWorkerDemo, $goatWorkerKind, $goatWorkerIds, $goatWorkerScan, $goatWorkerProgress, $goatWorkerCatalogJson, $goatWorkerRepositoryId, $goatWorkerItemId, $goatWorkerExternalAction, $goatWorkerRecommendationJson)
 '@
     $workerSource += "`r`n" + $script:GoatScannerSource + "`r`n" + $script:GoatCoreSource + "`r`n"
+    if ($Kind -eq 'Scan') { $workerSource += $script:GoatAdvancedScannerSource + "`r`n" + $script:GoatRecommendationSource + "`r`n" }
+    if ($Kind -eq 'Integration') { $workerSource += $script:GoatIntegrationSource + "`r`n" }
     $workerSource += @'
 $ErrorActionPreference = 'Stop'
+$script:GoatCatalogJson = $goatWorkerCatalogJson
+$script:GoatRecommendationJson = $goatWorkerRecommendationJson
 switch ($goatWorkerKind) {
     'Scan' {
         $scan = Get-GoatHardwareScan -Demo:$goatWorkerDemo
+        $advanced = Get-GoatAdvancedState -Demo:$goatWorkerDemo -Scan $scan
+        $recommendations = @(Get-GoatRecommendations -Scan $scan -AdvancedState $advanced)
+        Add-Member -InputObject $scan -NotePropertyName AdvancedState -NotePropertyValue $advanced -Force
+        Add-Member -InputObject $scan -NotePropertyName Recommendations -NotePropertyValue $recommendations -Force
         $game = if ($goatWorkerDemo) { 'Nenhum jogo detectado · demonstração' } else { Get-GoatDetectedGame }
         [pscustomobject]@{ Scan = $scan; Tweaks = @(Get-GoatTweaks -Scan $scan); Game = $game }
     }
     'Apply' { Invoke-GoatApply -Ids $goatWorkerIds -Scan $goatWorkerScan -Demo:$goatWorkerDemo -ProgressCallback { param($message) $goatWorkerProgress.Enqueue([string]$message) } }
     'Restore' { Restore-GoatLastTransaction -Demo:$goatWorkerDemo -ProgressCallback { param($message) $goatWorkerProgress.Enqueue([string]$message) } }
     'Telemetry' { [pscustomobject]@{ Sample = Get-GoatTelemetrySample; Game = Get-GoatDetectedGame } }
+    'Integration' { Invoke-GoatExternalItem -RepositoryId $goatWorkerRepositoryId -ItemId $goatWorkerItemId -Action $goatWorkerExternalAction -Demo:$goatWorkerDemo -ProgressCallback { param($message) $goatWorkerProgress.Enqueue([string]$message) } }
 }
 '@
     $ps = [PowerShell]::Create()
@@ -266,13 +526,20 @@ switch ($goatWorkerKind) {
     [void]$ps.AddArgument($Ids)
     [void]$ps.AddArgument($ui.Scan)
     [void]$ps.AddArgument($ui.Progress)
+    [void]$ps.AddArgument($script:GoatCatalogJson)
+    [void]$ps.AddArgument($RepositoryId)
+    [void]$ps.AddArgument($ItemId)
+    [void]$ps.AddArgument($ExternalAction)
+    [void]$ps.AddArgument($script:GoatRecommendationJson)
     try {
-        $worker = @{ PowerShell = $ps; Handle = $ps.BeginInvoke(); Kind = $Kind; Started = Get-Date }
+        $worker = @{ PowerShell = $ps; Handle = $ps.BeginInvoke(); Kind = $Kind; Started = Get-Date; ExternalAction = $ExternalAction; RepositoryId = $RepositoryId; ItemId = $ItemId }
         if ($Kind -eq 'Telemetry') { $ui.TelemetryWorker = $worker; return }
         $ui.Worker = $worker
         foreach ($check in $ui.Checkboxes) { $check.IsEnabled = $false }
         $ui.Controls.ScannerBadge.Text = $(if ($Kind -eq 'Scan') { '●  ANALISANDO' } else { '●  PROCESSANDO' })
-        Set-GoatUiStatus -Text $(switch ($Kind) { 'Scan' { 'Consultando hardware e configuração do Windows em segundo plano…' }; 'Apply' { 'Preparando ponto de restauração e registro dos valores originais…' }; 'Restore' { 'Preparando a recuperação da configuração anterior…' } })
+        $message = switch ($Kind) { 'Scan' { 'Consultando hardware e configuração do Windows em segundo plano…' }; 'Apply' { 'Preparando ponto de restauração e registro dos valores originais…' }; 'Restore' { 'Preparando a recuperação da configuração anterior…' }; 'Integration' { if ($ExternalAction -eq 'Download') { 'Baixando o arquivo original e validando a integridade…' } else { 'Preparando a abertura da ferramenta externa selecionada…' } } }
+        Set-GoatUiStatus -Text $message
+        if ($Kind -eq 'Integration') { $ui.Controls.CatalogOperationStatus.Text = $message }
         Update-GoatUiSelection
     } catch {
         $ps.Dispose()
@@ -294,15 +561,17 @@ function Update-GoatUiScan {
     $ui.Controls.SystemIdentity.Text = '{0}  ·  {1} núcleos / {2} threads' -f $scan.OS.Caption, $scan.CPU.Cores, $scan.CPU.Threads
     $ui.Controls.ScannerBadge.Text = $(if (@($scan.Errors).Count -gt 0) { '●  LEITURA PARCIAL' } else { '●  ANÁLISE CONCLUÍDA' })
     $recommended = @($ui.Tweaks | Where-Object { $_.Recommended -and $_.Available -and $_.State -ne 'Aplicado' }).Count
-    $ui.Controls.FindingSummary.Text = '{0} ajustes sugeridos para revisão' -f $recommended
-    $ui.Controls.ScanCount.Text = '{0} constatações · {1} opções disponíveis · sem estimativa artificial de FPS' -f @($scan.Findings).Count, @($ui.Tweaks | Where-Object { $_.Available }).Count
+    $reviewCount=@($scan.Recommendations | Where-Object Status -eq 'Revisão manual').Count
+    $configuredCount=@($scan.Recommendations | Where-Object Status -eq 'Configurado').Count
+    $ui.Controls.FindingSummary.Text = '{0} ajustes sugeridos · {1} análises cruzadas' -f $recommended,@($scan.Recommendations).Count
+    $ui.Controls.ScanCount.Text = '{0} configurados · {1} para revisão manual · confirme a evidência por área' -f $configuredCount,$reviewCount
     $ui.Controls.ModeBadge.Text = $(if (@($ui.Tweaks | Where-Object { $_.Id -eq 'game-mode' -and $_.State -eq 'Aplicado' }).Count -gt 0) { 'GAME MODE ATIVO' } else { 'REVISÃO TÉCNICA' })
     $ui.Controls.ActionHint.Text = $(if (-not $ui.Admin -and -not $ui.Demo) { 'Para aplicar, abra o aplicativo como administrador.' } elseif ($ui.Demo) { 'Demonstração: nenhuma configuração do PC será alterada.' } else { 'Ponto de restauração obrigatório. Cada alteração é registrada.' })
     $ui.Controls.DriverSummary.Text = '{0} drivers registrados no inventário. Versões são informadas pelo Windows.' -f @($scan.Drivers).Count
     $ui.Controls.DriversPanel.Children.Clear()
     foreach ($driver in @($scan.Drivers | Sort-Object DeviceName)) {
         $row = New-Object System.Windows.Controls.Border
-        $row.BorderBrush = [System.Windows.Media.BrushConverter]::new().ConvertFromString('#222B3B')
+        $row.BorderBrush = [System.Windows.Media.BrushConverter]::new().ConvertFromString('#242424')
         $row.BorderThickness = '0,0,0,1'
         $row.Padding = '0,9'
         $text = New-GoatUiText -Text ('{0}    ·    {1}    ·    {2}' -f $driver.DeviceName, $driver.DriverVersion, $driver.Manufacturer) -Size 11
@@ -316,7 +585,10 @@ function Update-GoatUiScan {
 function Complete-GoatUiWorkers {
     $ui = $script:GoatUi
     $progressMessage = ''
-    while ($ui.Progress.TryDequeue([ref]$progressMessage)) { Set-GoatUiStatus -Text $progressMessage }
+    while ($ui.Progress.TryDequeue([ref]$progressMessage)) {
+        Set-GoatUiStatus -Text $progressMessage
+        if ($ui.Worker -and $ui.Worker.Kind -eq 'Integration') { $ui.Controls.CatalogOperationStatus.Text = $progressMessage }
+    }
     if ($ui.Worker -and $ui.Worker.Handle.IsCompleted) {
         $worker = $ui.Worker
         $ui.Worker = $null
@@ -326,6 +598,17 @@ function Complete-GoatUiWorkers {
             if ($output.Count -eq 0) { throw 'A operação não retornou um resultado.' }
             $result = $output[-1]
             if ($worker.Kind -eq 'Scan') { Update-GoatUiScan -Result $result }
+            elseif ($worker.Kind -eq 'Integration') {
+                $message = [string]$result.Message
+                if ($result.LogPath) { $message += '  Log: ' + [string]$result.LogPath }
+                $ui.Controls.CatalogOperationStatus.Text = $message
+                Set-GoatUiStatus -Text $message -ErrorState (-not $result.Success)
+                $ui.Controls.ScannerBadge.Text = $(if ($result.Success) { '●  OPERAÇÃO CONCLUÍDA' } else { '●  VERIFICAR OPERAÇÃO' })
+                if ($result.Success -and $result.LocalPath -and -not $ui.Demo) {
+                    $ui.LastExternalPath = [string]$result.LocalPath
+                    $ui.Controls.CatalogOpenFolderButton.Visibility = 'Visible'
+                }
+            }
             else {
                 $message = [string]$result.Message
                 if ($result.LogPath) { $message += '  Log: ' + [string]$result.LogPath }
@@ -340,9 +623,11 @@ function Complete-GoatUiWorkers {
         } catch {
             $ui.Controls.ScannerBadge.Text = '●  VERIFICAR OPERAÇÃO'
             Set-GoatUiStatus -Text ('A operação não foi concluída: ' + $_.Exception.Message) -ErrorState $true
+            if ($worker.Kind -eq 'Integration') { $ui.Controls.CatalogOperationStatus.Text = 'A operação não foi concluída: ' + $_.Exception.Message }
         } finally {
             $worker.PowerShell.Dispose()
             if (-not $ui.Worker) { Update-GoatUiTweaks }
+            Update-GoatUiCatalogActions
         }
     }
     if ($ui.TelemetryWorker -and $ui.TelemetryWorker.Handle.IsCompleted) {
@@ -399,14 +684,36 @@ function Show-GoatWindow {
         Scan = $null; Tweaks = @(); Checkboxes = @(); Selections = @{}; Samples = @(); Metric = 'CPU'; Filter = 'Todos'; Page = 'Home'
         Worker = $null; TelemetryWorker = $null; LastTelemetry = Get-Date; Started = Get-Date
         Progress = [System.Collections.Concurrent.ConcurrentQueue[string]]::new(); Closing = $false
+        Repositories = @{}; CurrentRepository = $null; CatalogItem = $null; PrimaryItem = $null; CatalogRefreshing = $false; LastExternalPath = $null
+        VisibleRecommendations = @()
     }
     $ui = $script:GoatUi
+    if ($script:GoatLogoBase64) {
+        try {
+            $logoStream = New-Object System.IO.MemoryStream (,[Convert]::FromBase64String($script:GoatLogoBase64))
+            $logoImage = New-Object System.Windows.Media.Imaging.BitmapImage
+            $logoImage.BeginInit()
+            $logoImage.CacheOption = 'OnLoad'
+            $logoImage.DecodePixelWidth = 160
+            $logoImage.StreamSource = $logoStream
+            $logoImage.EndInit()
+            $logoImage.Freeze()
+            $logoStream.Dispose()
+            $controls.GoatLogo.Source = $logoImage
+        } catch { Set-GoatUiStatus -Text 'O logotipo não pôde ser carregado nesta distribuição.' -ErrorState $true }
+    }
+    if (Get-Command Get-GoatRepositoryCatalog -ErrorAction SilentlyContinue) {
+        try {
+            $catalog = Get-GoatRepositoryCatalog
+            foreach ($repository in @($catalog.Repositories)) { $ui.Repositories[[string]$repository.Id] = $repository }
+        } catch { Set-GoatUiStatus -Text ('Não foi possível carregar o catálogo: ' + $_.Exception.Message) -ErrorState $true }
+    }
     $controls.PrivilegeText.Text = $(if ($ui.Admin) { 'Administrador · sessão local' } else { 'Leitura · sessão sem elevação' })
     if ($Demo) {
         $controls.DemoBadge.Visibility = 'Visible'
         $controls.LiveBadge.Text = '●  SIMULAÇÃO'
         $controls.HardwareFootnote.Text = 'Dados demonstrativos. Este gráfico não representa as medições deste PC.'
-        $controls.FooterIdentity.Text = 'GOAT TWEAKS 2.2   /   DEMONSTRAÇÃO SEM ALTERAÇÕES'
+        $controls.FooterIdentity.Text = 'GOAT TWEAKS 2.3   /   DEMONSTRAÇÃO SEM ALTERAÇÕES'
         # Demo includes a clearly marked synthetic history; real mode only uses
         # samples actually returned after the monitor starts.
         $demoNow=Get-Date
@@ -415,7 +722,7 @@ function Show-GoatWindow {
             $ui.Samples += [pscustomobject]@{Timestamp=$demoNow.AddSeconds(-$age);CPU=(24+12*[Math]::Sin($tick/7));GPU=(39+16*[Math]::Sin($tick/9));RAM=(42+3*[Math]::Sin($tick/15))}
         }
     }
-    $navMap = @{ NavHome = 'Home'; NavGame = 'Game'; NavCPU = 'CPU'; NavGPU = 'GPU'; NavBIOS = 'BIOS'; NavNetwork = 'Network'; NavSystem = 'System'; NavDrivers = 'Drivers' }
+    $navMap = @{ NavHome = 'Home'; NavGame = 'Game'; NavCPU = 'CPU'; NavGPU = 'GPU'; NavRAM = 'RAM'; NavBIOS = 'BIOS'; NavNetwork = 'Network'; NavSystem = 'System'; NavDrivers = 'Drivers'; NavWinutil = 'Winutil'; NavWinSux = 'WinSux'; NavUltimate = 'Ultimate'; NavRyTuneX = 'RyTuneX' }
     foreach ($name in $navMap.Keys) {
         $controls[$name].Tag = $navMap[$name]
         $controls[$name].Add_Checked({ param($sender, $eventArgs) Set-GoatUiNavigation -Page ([string]$sender.Tag) })
@@ -431,6 +738,26 @@ function Show-GoatWindow {
         if ($ids.Count -gt 0) { Start-GoatUiWorker -Kind Apply -Ids $ids }
     })
     $controls.RestoreButton.Add_Click({ Start-GoatUiWorker -Kind Restore })
+    $controls.CatalogSearchBox.Add_TextChanged({ Update-GoatUiCatalogFilter })
+    $controls.CatalogGroupFilter.Add_SelectionChanged({ Update-GoatUiCatalogFilter })
+    $controls.CatalogKindFilter.Add_SelectionChanged({ Update-GoatUiCatalogFilter })
+    $controls.CatalogGrid.Add_SelectionChanged({ Update-GoatUiCatalogDetails })
+    $controls.CatalogGrid.Add_SizeChanged({ Update-GoatUiCatalogColumns })
+    $controls.CatalogViewSourceButton.Add_Click({ Open-GoatUiSourceUrl -Url ([string]$script:GoatUi.CatalogItem.SourceUrl) })
+    $controls.CatalogRepositoryButton.Add_Click({ Open-GoatUiSourceUrl -Url ([string]$script:GoatUi.CurrentRepository.RepositoryUrl) })
+    $controls.CatalogLicenseButton.Add_Click({ Open-GoatUiSourceUrl -Url ([string]$script:GoatUi.CurrentRepository.LicenseUrl) })
+    $controls.CatalogDownloadButton.Add_Click({ Invoke-GoatUiExternalAction -Action Download -Item $script:GoatUi.CatalogItem })
+    $controls.CatalogRunButton.Add_Click({ Invoke-GoatUiExternalAction -Action Run -Item $script:GoatUi.CatalogItem })
+    $controls.CatalogPrimaryButton.Add_Click({
+        if ($script:GoatUi.PrimaryItem) { Invoke-GoatUiExternalAction -Action Run -Item $script:GoatUi.PrimaryItem }
+        else { Open-GoatUiSourceUrl -Url ([string]$script:GoatUi.CurrentRepository.RepositoryUrl) }
+    })
+    $controls.CatalogOpenFolderButton.Add_Click({
+        if ($script:GoatUi.LastExternalPath) {
+            try { Start-Process -FilePath 'explorer.exe' -ArgumentList ('/select,"{0}"' -f $script:GoatUi.LastExternalPath) -ErrorAction Stop | Out-Null }
+            catch { Set-GoatUiStatus -Text ('Não foi possível abrir a pasta: ' + $_.Exception.Message) -ErrorState $true }
+        }
+    })
     $controls.MinimizeButton.Add_Click({ $script:GoatUi.Window.WindowState = 'Minimized' })
     $controls.CloseButton.Add_Click({ $script:GoatUi.Window.Close() })
     $controls.DragBar.Add_MouseLeftButtonDown({
@@ -458,7 +785,7 @@ function Show-GoatWindow {
         $button.HorizontalContentAlignment = 'Left'
         $button.Tag = $tool[2]
         $stack = New-Object System.Windows.Controls.StackPanel
-        $title = New-GoatUiText -Text ($tool[0] + ' ↗') -Color '#D5B9F5' -Size 12
+        $title = New-GoatUiText -Text ($tool[0] + ' ↗') -Color '#E4B95B' -Size 12
         $title.FontWeight = 'SemiBold'
         [void]$stack.Children.Add($title)
         $detail = New-GoatUiText -Text $tool[1] -Size 10

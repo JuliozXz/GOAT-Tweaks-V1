@@ -101,13 +101,20 @@ try {
                 if ($ui.Worker -or -not $ui.Scan -or $ui.Samples.Count -lt 2) { return }
                 Assert-GoatRemote (-not $ui.Demo -and -not $ui.Scan.IsDemo) 'production UI uses real read-only hardware scan'
                 Assert-GoatRemote (-not $ui.Controls.DemoBadge.IsVisible) 'production UI is not labeled demonstration'
-                Assert-GoatRemote ($ui.Tweaks.Count -eq 8) 'embedded engine returned complete catalog'
+                Assert-GoatRemote ($ui.Tweaks.Count -eq 9) 'embedded engine returned complete native catalog'
                 Assert-GoatRemote (-not [string]::IsNullOrWhiteSpace([string]$ui.Scan.OS.Caption)) 'real operating system data reached UI'
                 Assert-GoatRemote (-not [string]::IsNullOrWhiteSpace([string]$ui.Scan.CPU.Name)) 'real CPU data reached UI'
                 $measured = @($ui.Samples | Where-Object { $null -ne $_.CPU -or $null -ne $_.RAM -or $null -ne $_.GPU })
                 Assert-GoatRemote ($measured.Count -ge 2) 'live telemetry samples contain available measurements'
                 Assert-GoatRemote ($ui.Controls.ChartLine.Points.Count -gt 0) 'live telemetry chart rendered'
                 Assert-GoatRemote ($script:GoatXaml.Contains('Visão geral')) 'embedded UTF-8 interface text decoded correctly'
+                Assert-GoatRemote ($ui.Repositories.Count -eq 4) 'four embedded original repositories loaded'
+                $externalCount=0
+                foreach ($repository in $ui.Repositories.Values) { $externalCount+=@($repository.Items).Count }
+                Assert-GoatRemote ($externalCount -eq 1330) 'all 1330 embedded original items loaded'
+                Assert-GoatRemote ($null -ne $ui.Controls.GoatLogo.Source) 'embedded original logo rendered'
+                Assert-GoatRemote (@($ui.Scan.Recommendations).Count -ge 20) 'cross-reference recommendations reached production UI'
+                Assert-GoatRemote ($null -ne $ui.Scan.AdvancedState.Readings['memory-compression']) 'RAM compression probe reached production UI'
                 Save-GoatRemoteCapture $window
                 $script:GoatRemoteQa.Completed = $true
                 $script:GoatRemoteQa.Timer.Stop()

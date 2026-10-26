@@ -14,9 +14,12 @@ if ($PSVersionTable.PSEdition -ne 'Desktop' -or -not [Environment]::Is64BitProce
 
 . ([scriptblock]::Create($script:GoatCoreSource))
 . ([scriptblock]::Create($script:GoatScannerSource))
+. ([scriptblock]::Create($script:GoatAdvancedScannerSource))
+. ([scriptblock]::Create($script:GoatRecommendationSource))
 if ($ScanOnly) {
-    Get-GoatHardwareScan -Demo:$Demo | ConvertTo-Json -Depth 12
+    Get-GoatUnifiedScan -Demo:$Demo | ConvertTo-Json -Depth 16
     return
 }
+. ([scriptblock]::Create($script:GoatIntegrationSource))
 . ([scriptblock]::Create($script:GoatUiSource))
 Show-GoatWindow -Demo:$Demo

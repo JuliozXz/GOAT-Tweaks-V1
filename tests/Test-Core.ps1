@@ -40,6 +40,9 @@ function Reset-TestScenario {
     $script:FailOnWrite = 0
     $script:CheckpointCalls = 0
     $script:CheckpointFails = $false
+    $script:MemoryCompression = $false
+    $script:MemoryReadFails = $false
+    $script:MemoryWriteFails = $false
     $script:FailCommitLog = $false
     $script:CommitFailureObserved = $false
     $script:Points = @()
@@ -77,6 +80,22 @@ function Invoke-GoatNative {
     throw 'TEST GUARD: native mutation must never be invoked.'
 }
 function Set-NetTCPSetting { throw 'TEST GUARD: TCP mutation must never be invoked.' }
+function Get-MMAgent {
+    if ($script:MemoryReadFails) { throw 'SIMULATED: unavailable MMAgent' }
+    return [pscustomobject]@{MemoryCompression=$script:MemoryCompression}
+}
+function Set-TestMemoryCompression {
+    param([bool]$Enabled)
+    $journal=Get-TestJournal
+    Assert-Test ($journal.RestorePoint -eq 123) 'Memory compression write must have verified protection.'
+    Assert-Test ($journal.Steps[0].Original -is [bool]) 'Original Boolean memory state must be persisted before writing.'
+    Assert-Test ($journal.Steps[0].Status -in @('Applying','Applied','Restoring')) 'Memory step intent must precede writing.'
+    $script:WriteCount++
+    $script:MemoryCompression=$Enabled
+    if ($script:MemoryWriteFails) { $script:MemoryWriteFails=$false; throw 'SIMULATED: MMAgent failed after writing' }
+}
+function Enable-MMAgent { param([switch]$MemoryCompression) Set-TestMemoryCompression $true }
+function Disable-MMAgent { param([switch]$MemoryCompression) Set-TestMemoryCompression $false }
 function Set-NetOffloadGlobalSetting { throw 'TEST GUARD: offload mutation must never be invoked.' }
 function Checkpoint-Computer { throw 'TEST GUARD: real checkpoint API must never be invoked.' }
 function Write-GoatLog {
@@ -285,6 +304,41 @@ try {
     $undo = Restore-GoatLastTransaction
     Assert-Test (-not $result.Success -and -not $undo.Success -and $script:WriteCount -eq 0) 'Apply and restore require administrator access.'
     Complete-Test 'Administrator guard applies to mutation and recovery'
+
+    Reset-TestScenario 'memory-compression-restore'
+    $result=Invoke-GoatApply -Ids @('memory-compression') -Scan $script:Scan
+    Assert-Test ($result.Success -and $script:MemoryCompression) 'Compression must enable through protected transaction.'
+    Assert-Test ((Get-TestJournal).Steps[0].Original -eq $false) 'Disabled original must be saved as Boolean false.'
+    $undo=Restore-GoatLastTransaction
+    Assert-Test ($undo.Success -and -not $script:MemoryCompression -and $script:WriteCount -eq 2) 'Undo must restore original compression state.'
+    Complete-Test 'Memory compression apply and undo preserve original Boolean state'
+
+    Reset-TestScenario 'memory-compression-partial-failure'
+    $script:MemoryWriteFails=$true
+    $result=Invoke-GoatApply -Ids @('memory-compression') -Scan $script:Scan
+    Assert-Test (-not $result.Success -and -not $script:MemoryCompression -and $script:WriteCount -eq 2) 'Partial compression write must roll back its original state.'
+    Complete-Test 'Memory compression partial failure rolls back in-flight change'
+
+    Reset-TestScenario 'memory-compression-unavailable'
+    $script:MemoryReadFails=$true
+    $result=Invoke-GoatApply -Ids @('memory-compression') -Scan $script:Scan
+    Assert-Test (-not $result.Success -and $script:WriteCount -eq 0 -and $script:CheckpointCalls -eq 0) 'Unknown compression state must block mutation.'
+    Complete-Test 'Unknown memory compression state blocks apply'
+
+    Reset-TestScenario 'demo-advanced-state'
+    $demoScan=[pscustomobject]@{IsDemo=$true;OS=[pscustomobject]@{Supported=$true};AdvancedState=[pscustomobject]@{Readings=@{
+        'memory-compression'=[pscustomobject]@{Available=$true;Value=$false}
+        'network-autotuning'=[pscustomobject]@{Available=$true;Value='normal'}
+        'rss'=[pscustomobject]@{Available=$true;Value='Enabled'}
+    }}}
+    foreach ($snapshot in @($demoScan,($demoScan|ConvertTo-Json -Depth 8|ConvertFrom-Json))) {
+        $demoTweaks=@(Get-GoatTweaks -Scan $snapshot)
+        $memory=@($demoTweaks|Where-Object Id -eq 'memory-compression')[0]
+        Assert-Test ($memory.Available -and $memory.Recommended) 'Demo compression false must remain available before and after JSON conversion.'
+        Assert-Test (@($demoTweaks|Where-Object {$_.Id -in @('tcp-normal','rss-on') -and $_.State -eq 'Aplicado'}).Count -eq 2) 'Demo TCP and RSS must agree with the configured advanced snapshot.'
+    }
+    Assert-Test ($script:WriteCount -eq 0) 'Demo catalog cannot write Windows state.'
+    Complete-Test 'Demo recommendations and native states agree across JSON round-trip'
 
     Write-Output "PASS: $script:Passed transaction tests; no Windows settings were changed."
 }

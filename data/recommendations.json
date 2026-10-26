@@ -1,0 +1,644 @@
+{
+  "SchemaVersion": 1,
+  "ReviewedAt": "2026-10-26",
+  "Rules": [
+    {
+      "Id": "memory-compression",
+      "Category": "RAM",
+      "Title": "Compressão de memória do Windows",
+      "ProbeKey": "memory-compression",
+      "Evaluation": "BooleanTrue",
+      "Recommendation": "Se estiver desativada, considere reativar a compressão após conferir pressão de RAM, paginação e custo de CPU na carga do cliente. Compare antes/depois; ativação não garante FPS ou menor latência. Estado não lido não autoriza alteração.",
+      "Risk": "Moderado",
+      "ActionId": "memory-compression",
+      "Sources": [
+        {
+          "RepositoryId": "ultimate",
+          "ItemId": "file:3 Setup/2 Memory Compression.ps1",
+          "Url": "https://github.com/FR33THYFR33THY/Ultimate/blob/a0a33a57078434201f582b0db5107dcbb502292a/3%20Setup/2%20Memory%20Compression.ps1",
+          "Stance": "Disable",
+          "Note": "O menu recomenda Off e executa Disable-MMAgent -MemoryCompression; também oferece Enable e consulta. Isso é orientação do autor, sem benchmark universal."
+        },
+        {
+          "RepositoryId": "winsux",
+          "ItemId": "file:WinSux/steptwo.ps1",
+          "Url": "https://github.com/FR33THYFR33THY/WinSux/blob/91adbfd63b7ed2eb5fcf0821fd53405a3cf63573/WinSux/steptwo.ps1",
+          "Stance": "Disable",
+          "Note": "A etapa dois chama Disable-MMAgent -MemoryCompression (linhas 431–433); depende do fluxo WinSux."
+        },
+        {
+          "RepositoryId": "microsoft",
+          "ItemId": "",
+          "Url": "https://learn.microsoft.com/en-us/powershell/module/mmagent/enable-mmagent",
+          "Stance": "Enable",
+          "Note": "A API oficial oferece -MemoryCompression. A opção de habilitar aqui é uma decisão conservadora do GOAT, não uma garantia da documentação."
+        }
+      ],
+      "Desired": true,
+      "Conflict": true
+    },
+    {
+      "Id": "system-cache",
+      "Category": "RAM",
+      "Title": "Cache de sistema e prefetch",
+      "ProbeKey": "system-cache",
+      "Evaluation": "Review",
+      "Recommendation": "Revise LargeSystemCache, prefetch e carga real. Não aumente cache nem desative prefetch apenas pela capacidade de RAM. Ausência de valor não comprova desativação; não confunda cache de arquivos, compressão de RAM e compactação do Windows.",
+      "Risk": "Moderado",
+      "ActionId": "",
+      "Sources": [
+        {
+          "RepositoryId": "rytunex",
+          "ItemId": "file:Helpers/OptimizeSystemHelper.cs",
+          "Url": "https://github.com/rayenghanmi/RyTuneX/blob/957885f53beaacfa7322581cafdb9eba5df5726a/Helpers/OptimizeSystemHelper.cs",
+          "Stance": "Enable",
+          "Note": "EnableLargeSystemCache escreve LargeSystemCache=1; o par de reversão escreve 0. Métodos DisablePrefetch/EnablePrefetch também existem."
+        },
+        {
+          "RepositoryId": "ultimate",
+          "ItemId": "file:8 Advanced/6 MMAgent Features.ps1",
+          "Url": "https://github.com/FR33THYFR33THY/Ultimate/blob/a0a33a57078434201f582b0db5107dcbb502292a/8%20Advanced/6%20MMAgent%20Features.ps1",
+          "Stance": "Review",
+          "Note": "Expõe opções de MMAgent além da compressão. São recursos distintos e precisam de avaliação da carga."
+        }
+      ]
+    },
+    {
+      "Id": "core-parking",
+      "Category": "CPU",
+      "Title": "Estacionamento de núcleos",
+      "ProbeKey": "core-parking",
+      "Evaluation": "Review",
+      "Recommendation": "Leia o plano ativo e parâmetros disponíveis. Compare carga, consumo e temperatura antes de alterar; núcleos estacionados não comprovam gargalo. Em CPUs híbridas, preserve a política do Windows sem uma medição que justifique mudança.",
+      "Risk": "Moderado",
+      "ActionId": "",
+      "Sources": [
+        {
+          "RepositoryId": "ultimate",
+          "ItemId": "file:6 Windows/29 Power Plan.ps1",
+          "Url": "https://github.com/FR33THYFR33THY/Ultimate/blob/a0a33a57078434201f582b0db5107dcbb502292a/6%20Windows/29%20Power%20Plan.ps1",
+          "Stance": "Disable",
+          "Note": "Cria/configura plano com mínimo e máximo de núcleos disponíveis em 100%; não equivale a um diagnóstico de que parking prejudica este PC."
+        },
+        {
+          "RepositoryId": "microsoft",
+          "ItemId": "",
+          "Url": "https://learn.microsoft.com/en-us/windows-hardware/customize/power-settings/options-for-core-parking-cpmincores",
+          "Stance": "Reference",
+          "Note": "CPMinCores=100 desativa o algoritmo de parking; a configuração é percentual e pode variar por classe de eficiência."
+        }
+      ]
+    },
+    {
+      "Id": "process-scheduling",
+      "Category": "CPU",
+      "Title": "Prioridade, afinidade e agendamento",
+      "ProbeKey": "process-scheduling",
+      "Evaluation": "Review",
+      "Recommendation": "Não aplique prioridade Alta/Tempo real, afinidade fixa ou máscaras globais como melhor ajuste universal. Identifique o processo e compare frametimes, áudio e tarefas concorrentes; valores de Registro não medem input lag.",
+      "Risk": "Alto",
+      "ActionId": "",
+      "Sources": [
+        {
+          "RepositoryId": "ultimate",
+          "ItemId": "file:8 Advanced/10 Priority.ps1",
+          "Url": "https://github.com/FR33THYFR33THY/Ultimate/blob/a0a33a57078434201f582b0db5107dcbb502292a/8%20Advanced/10%20Priority.ps1",
+          "Stance": "Review",
+          "Note": "Permite escolher prioridade de processo, incluindo RealTime; o próprio texto pede teste temporário por jogo/app."
+        },
+        {
+          "RepositoryId": "ultimate",
+          "ItemId": "file:8 Advanced/9 Core 1 Thread 1.ps1",
+          "Url": "https://github.com/FR33THYFR33THY/Ultimate/blob/a0a33a57078434201f582b0db5107dcbb502292a/8%20Advanced/9%20Core%201%20Thread%201.ps1",
+          "Stance": "Review",
+          "Note": "Oferece alteração de afinidade. Exige entendimento de topologia e do processo alvo."
+        },
+        {
+          "RepositoryId": "winsux",
+          "ItemId": "file:WinSux/reg.reg",
+          "Url": "https://github.com/FR33THYFR33THY/WinSux/blob/91adbfd63b7ed2eb5fcf0821fd53405a3cf63573/WinSux/reg.reg",
+          "Stance": "Reference",
+          "Note": "Define Win32PrioritySeparation=0x26. Esse valor é uma escolha do script, não resultado de análise da CPU."
+        },
+        {
+          "RepositoryId": "rytunex",
+          "ItemId": "file:Helpers/OptimizeSystemHelper.cs",
+          "Url": "https://github.com/rayenghanmi/RyTuneX/blob/957885f53beaacfa7322581cafdb9eba5df5726a/Helpers/OptimizeSystemHelper.cs",
+          "Stance": "Reference",
+          "Note": "Usa Win32PrioritySeparation=42 e opção de reversão=2; também altera SystemResponsiveness. Valores diferentes reforçam a necessidade de revisão, sem escolher vencedor por popularidade."
+        }
+      ],
+      "Conflict": true
+    },
+    {
+      "Id": "msi-gpu",
+      "Category": "GPU",
+      "Title": "MSI e prioridade de interrupções da GPU",
+      "ProbeKey": "msi-gpu",
+      "Evaluation": "Review",
+      "Recommendation": "Confira declaração MSI do driver e documentação do dispositivo. MSISupported não prova a alocação em execução; valor ausente é desconhecido. Não force MSI nem prioridade High em todas as GPUs.",
+      "Risk": "Alto",
+      "ActionId": "",
+      "Sources": [
+        {
+          "RepositoryId": "ultimate",
+          "ItemId": "file:5 Graphics/10 Msi Mode.ps1",
+          "Url": "https://github.com/FR33THYFR33THY/Ultimate/blob/a0a33a57078434201f582b0db5107dcbb502292a/5%20Graphics/10%20Msi%20Mode.ps1",
+          "Stance": "Enable",
+          "Note": "Oferece ligar/desligar MSISupported para todas as GPUs. O script não comprova previamente suporte e benefício de cada driver."
+        },
+        {
+          "RepositoryId": "microsoft",
+          "ItemId": "",
+          "Url": "https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/enabling-message-signaled-interrupts-in-the-registry",
+          "Stance": "Reference",
+          "Note": "MSI é habilitado pelo INF do driver; a chave é configuração de suporte, não medição de latência."
+        },
+        {
+          "RepositoryId": "microsoft",
+          "ItemId": "",
+          "Url": "https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/interrupt-affinity-and-priority",
+          "Stance": "Reference",
+          "Note": "A política de afinidade padrão é recomendada quando aplicável; afinidade/prioridade devem respeitar o dispositivo."
+        }
+      ]
+    },
+    {
+      "Id": "msi-storage",
+      "Category": "BIOS",
+      "Title": "MSI dos controladores de armazenamento",
+      "ProbeKey": "msi-storage",
+      "Evaluation": "Review",
+      "Recommendation": "Cobertura limitada: o ajuste MSI do Ultimate revisado trata GPUs, não valida controladores NVMe/SATA. Consulte o driver do controlador e mantenha a configuração do fabricante; não replique ajustes de GPU em armazenamento.",
+      "Risk": "Alto",
+      "ActionId": "",
+      "Sources": [
+        {
+          "RepositoryId": "microsoft",
+          "ItemId": "",
+          "Url": "https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/enabling-message-signaled-interrupts-in-the-registry",
+          "Stance": "Reference",
+          "Note": "A configuração MSI depende do driver/dispositivo. Não foi identificada rotina específica validada para todos os controladores nos quatro projetos revisados."
+        }
+      ]
+    },
+    {
+      "Id": "hags",
+      "Category": "GPU",
+      "Title": "Agendamento de GPU por hardware (HAGS)",
+      "ProbeKey": "hags",
+      "Evaluation": "Review",
+      "Recommendation": "Confira se GPU e driver expõem HAGS nas configurações do Windows. Compare os mesmos jogos e aplicações antes/depois; a chave HwSchMode ou a build do sistema, isoladamente, não comprovam suporte ou ganho.",
+      "Risk": "Moderado",
+      "ActionId": "",
+      "Sources": [
+        {
+          "RepositoryId": "rytunex",
+          "ItemId": "file:Helpers/OptimizeSystemHelper.cs",
+          "Url": "https://github.com/rayenghanmi/RyTuneX/blob/957885f53beaacfa7322581cafdb9eba5df5726a/Helpers/OptimizeSystemHelper.cs",
+          "Stance": "Enable",
+          "Note": "Métodos de HAGS escrevem HwSchMode=2 ou 1 e existem opções que removem o valor."
+        },
+        {
+          "RepositoryId": "winsux",
+          "ItemId": "file:WinSux/reg.reg",
+          "Url": "https://github.com/FR33THYFR33THY/WinSux/blob/91adbfd63b7ed2eb5fcf0821fd53405a3cf63573/WinSux/reg.reg",
+          "Stance": "Enable",
+          "Note": "Define HwSchMode=2; isso não verifica capacidade do driver."
+        },
+        {
+          "RepositoryId": "ultimate",
+          "ItemId": "file:5 Graphics/14 Hags Windowed.ps1",
+          "Url": "https://github.com/FR33THYFR33THY/Ultimate/blob/a0a33a57078434201f582b0db5107dcbb502292a/5%20Graphics/14%20Hags%20Windowed.ps1",
+          "Stance": "Review",
+          "Note": "Abre a página de configurações gráficas do Windows."
+        },
+        {
+          "RepositoryId": "microsoft",
+          "ItemId": "",
+          "Url": "https://devblogs.microsoft.com/directx/hardware-accelerated-gpu-scheduling/",
+          "Stance": "Reference",
+          "Note": "HAGS depende de hardware e driver que exponham suporte; a avaliação é específica da carga."
+        }
+      ]
+    },
+    {
+      "Id": "rebar",
+      "Category": "GPU",
+      "Title": "Resizable BAR / Smart Access Memory",
+      "ProbeKey": "rebar",
+      "Evaluation": "Unsupported",
+      "Recommendation": "Confirme suporte e ativação no firmware, driver e painel do fabricante. A leitura universal confiável não está disponível neste scanner. Não force perfis ReBAR para todos os jogos nem deduza estado pela marca da GPU.",
+      "Risk": "Alto",
+      "ActionId": "",
+      "Sources": [
+        {
+          "RepositoryId": "ultimate",
+          "ItemId": "file:8 Advanced/7 ReBar Force.ps1",
+          "Url": "https://github.com/FR33THYFR33THY/Ultimate/blob/a0a33a57078434201f582b0db5107dcbb502292a/8%20Advanced/7%20ReBar%20Force.ps1",
+          "Stance": "Enable",
+          "Note": "Oferece forçar ReBAR via perfis/configurações do driver, incluindo downloads e reinício; é diferente de verificar suporte efetivo."
+        },
+        {
+          "RepositoryId": "microsoft",
+          "ItemId": "",
+          "Url": "https://learn.microsoft.com/en-us/windows-hardware/drivers/display/resizable-bar-support",
+          "Stance": "Reference",
+          "Note": "ReBAR envolve firmware, PCIe, GPU e WDDM; o sistema negocia o tamanho do BAR quando suportado."
+        }
+      ]
+    },
+    {
+      "Id": "cstates",
+      "Category": "CPU",
+      "Title": "C-States e política de repouso da CPU",
+      "ProbeKey": "cstates",
+      "Evaluation": "Unsupported",
+      "Recommendation": "Confirme as opções no firmware e a orientação do fabricante. Nome da CPU, plano de energia e número de threads não comprovam C-States ativos. Compare consumo, temperatura e estabilidade; não desative estados de repouso em todas as máquinas.",
+      "Risk": "Alto",
+      "ActionId": "",
+      "Sources": [
+        {
+          "RepositoryId": "ultimate",
+          "ItemId": "file:1 Check/1 Bios Check.ps1",
+          "Url": "https://github.com/FR33THYFR33THY/Ultimate/blob/a0a33a57078434201f582b0db5107dcbb502292a/1%20Check/1%20Bios%20Check.ps1",
+          "Stance": "Disable",
+          "Note": "Guia textual sugere desativar C-state apenas para Intel K; não detecta o estado real e pode reiniciar no firmware."
+        },
+        {
+          "RepositoryId": "microsoft",
+          "ItemId": "",
+          "Url": "https://learn.microsoft.com/en-us/previous-versions/windows/desktop/xperf/cpu-idle-states",
+          "Stance": "Reference",
+          "Note": "Estados expostos variam conforme o processador e fabricante; o alvo de energia do Windows depende da carga."
+        }
+      ]
+    },
+    {
+      "Id": "timers",
+      "Category": "BIOS",
+      "Title": "HPET, dynamic tick e resolução de timer",
+      "ProbeKey": "timers",
+      "Evaluation": "Review",
+      "Recommendation": "Revise alterações de boot ou serviços já presentes antes de manter qualquer tweak. Não ajuste HPET, BCD ou timer global automaticamente para prometer FPS. Essas opções exigem ensaio reproduzível e podem afetar energia e estabilidade.",
+      "Risk": "Alto",
+      "ActionId": "",
+      "Sources": [
+        {
+          "RepositoryId": "ultimate",
+          "ItemId": "file:6 Windows/30 Timer Resolution.ps1",
+          "Url": "https://github.com/FR33THYFR33THY/Ultimate/blob/a0a33a57078434201f582b0db5107dcbb502292a/6%20Windows/30%20Timer%20Resolution.ps1",
+          "Stance": "Enable",
+          "Note": "Compila e instala um serviço persistente e define GlobalTimerResolutionRequests; oferece remoção."
+        },
+        {
+          "RepositoryId": "winsux",
+          "ItemId": "file:WinSux/steptwo.ps1",
+          "Url": "https://github.com/FR33THYFR33THY/WinSux/blob/91adbfd63b7ed2eb5fcf0821fd53405a3cf63573/WinSux/steptwo.ps1",
+          "Stance": "Enable",
+          "Note": "Compila serviço de timer a partir do CS preparado pelo fluxo e instala serviço; não é ajuste isolado de Registro."
+        },
+        {
+          "RepositoryId": "rytunex",
+          "ItemId": "file:Helpers/OptimizeSystemHelper.cs",
+          "Url": "https://github.com/rayenghanmi/RyTuneX/blob/957885f53beaacfa7322581cafdb9eba5df5726a/Helpers/OptimizeSystemHelper.cs",
+          "Stance": "Review",
+          "Note": "Oferece GlobalTimerResolutionRequests, opções de HPET via BCD e dynamic tick, com métodos de reversão."
+        },
+        {
+          "RepositoryId": "microsoft",
+          "ItemId": "",
+          "Url": "https://learn.microsoft.com/en-us/windows-hardware/drivers/devtest/bcdedit--set",
+          "Stance": "Reference",
+          "Note": "A documentação identifica opções de timer/clock como recursos de depuração; não é evidência de ganho universal."
+        }
+      ]
+    },
+    {
+      "Id": "network-autotuning",
+      "Category": "Rede",
+      "Title": "Auto-tuning TCP do perfil Internet",
+      "ProbeKey": "network-autotuning",
+      "Evaluation": "Equals",
+      "Recommendation": "Se o perfil Internet estiver em nível restringido, revise a política e considere Normal. A ação nativa altera somente esse perfil e preserva o anterior; TCP auto-tuning afeta janela/throughput e não garante redução do ping de jogos.",
+      "Risk": "Moderado",
+      "ActionId": "tcp-normal",
+      "Sources": [
+        {
+          "RepositoryId": "microsoft",
+          "ItemId": "",
+          "Url": "https://learn.microsoft.com/en-us/powershell/module/nettcpip/set-nettcpsetting",
+          "Stance": "Reference",
+          "Note": "Documenta AutoTuningLevelLocal e os níveis; a ação GOAT é restrita a SettingName Internet."
+        },
+        {
+          "RepositoryId": "microsoft",
+          "ItemId": "",
+          "Url": "https://learn.microsoft.com/en-us/troubleshoot/windows-server/networking/tcpip-performance-known-issues",
+          "Stance": "Reference",
+          "Note": "Normal é orientação para cenários de janela TCP restringida. Cobertura upstream específica não comprovada para esse mesmo efeito nas revisões analisadas."
+        }
+      ],
+      "Desired": "normal"
+    },
+    {
+      "Id": "rss",
+      "Category": "Rede",
+      "Title": "Receive-Side Scaling (RSS) global",
+      "ProbeKey": "rss",
+      "Evaluation": "Equals",
+      "Recommendation": "Se RSS global estiver desativado, considere habilitar após confirmar compatibilidade do adaptador/driver e a carga. RSS global não comprova que cada NIC o esteja usando. Preserve offloads existentes e compare estabilidade e processamento de recepção.",
+      "Risk": "Moderado",
+      "ActionId": "rss-on",
+      "Sources": [
+        {
+          "RepositoryId": "rytunex",
+          "ItemId": "file:Views/NetworkPage.xaml.cs",
+          "Url": "https://github.com/rayenghanmi/RyTuneX/blob/957885f53beaacfa7322581cafdb9eba5df5726a/Views/NetworkPage.xaml.cs",
+          "Stance": "Enable",
+          "Note": "O controle RSS usa netsh int tcp set global rss=enabled/disabled e consulta seu estado."
+        },
+        {
+          "RepositoryId": "microsoft",
+          "ItemId": "",
+          "Url": "https://learn.microsoft.com/en-us/windows-server/networking/technologies/network-subsystem/net-sub-performance-tuning-nics",
+          "Stance": "Reference",
+          "Note": "RSS distribui recepção; tuning depende do hardware e da carga. A documentação de Server não certifica todo desktop."
+        }
+      ],
+      "Desired": "Enabled"
+    },
+    {
+      "Id": "qos",
+      "Category": "Rede",
+      "Title": "QoS, reservas e políticas de tráfego",
+      "ProbeKey": "qos",
+      "Evaluation": "Review",
+      "Recommendation": "Cobertura limitada para uma alteração uniforme nos quatro projetos. Revise políticas efetivas e a aplicação; não prometa liberar uma porcentagem fixa da Internet removendo QoS. Não confunda QoS de rede, MMCSS e prioridade de CPU.",
+      "Risk": "Moderado",
+      "ActionId": "",
+      "Sources": [
+        {
+          "RepositoryId": "microsoft",
+          "ItemId": "",
+          "Url": "https://learn.microsoft.com/en-us/windows-server/networking/technologies/qos/qos-policy-top",
+          "Stance": "Reference",
+          "Note": "Políticas QoS classificam tráfego e podem controlar DSCP/limites por aplicação; isso não comprova uma reserva fixa sempre desperdiçada."
+        }
+      ]
+    },
+    {
+      "Id": "adapter-power",
+      "Category": "Rede",
+      "Title": "Energia do adaptador e Wake-on-LAN",
+      "ProbeKey": "adapter-power",
+      "Evaluation": "Review",
+      "Recommendation": "Revise adaptador por adaptador e preserve necessidades de suspensão, bateria e Wake-on-LAN. Energia, EEE e offloads de checksum/LSO/RSS são recursos distintos. Não copie propriedades de Registro entre drivers nem desative tudo globalmente.",
+      "Risk": "Alto",
+      "ActionId": "",
+      "Sources": [
+        {
+          "RepositoryId": "ultimate",
+          "ItemId": "file:6 Windows/26 Network Adapter Power Savings & Wake.ps1",
+          "Url": "https://github.com/FR33THYFR33THY/Ultimate/blob/a0a33a57078434201f582b0db5107dcbb502292a/6%20Windows/26%20Network%20Adapter%20Power%20Savings%20%26%20Wake.ps1",
+          "Stance": "Disable",
+          "Note": "Percorre adaptadores e modifica PnPCapabilities, EEE, modos econômicos e wake. Propriedades específicas de fabricantes não são universais."
+        },
+        {
+          "RepositoryId": "microsoft",
+          "ItemId": "",
+          "Url": "https://learn.microsoft.com/en-us/windows-hardware/drivers/network/avoiding-ndis-power-management-problems",
+          "Stance": "Reference",
+          "Note": "A documentação orienta a não controlar energia NDIS apenas por valores de Registro; o suporte vem do driver/barramento."
+        },
+        {
+          "RepositoryId": "microsoft",
+          "ItemId": "",
+          "Url": "https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/wmi-and-the-power-management-tab",
+          "Stance": "Reference",
+          "Note": "A semântica da opção é dependente do dispositivo; em Modern Standby, mudanças podem aumentar o consumo."
+        }
+      ]
+    },
+    {
+      "Id": "windows-update",
+      "Category": "Sistema",
+      "Title": "Windows Update e atualização de drivers",
+      "ProbeKey": "windows-update",
+      "Evaluation": "Review",
+      "Recommendation": "Identifique políticas e serviços antes de alterar. Preserve atualizações de segurança e planeje janelas de manutenção. Pausar, adiar recursos, excluir drivers e bloquear atualizações são efeitos diferentes; não recomende desativação geral para aumentar FPS.",
+      "Risk": "Alto",
+      "ActionId": "",
+      "Sources": [
+        {
+          "RepositoryId": "winutil",
+          "ItemId": "file:functions/public/Invoke-WPFUpdatesdefault.ps1",
+          "Url": "https://github.com/ChrisTitusTech/winutil/blob/2f0bdc8fca52e1ebe31a8d98216428061d3f8956/functions/public/Invoke-WPFUpdatesdefault.ps1",
+          "Stance": "Enable",
+          "Note": "Contém restauração do comportamento de Windows Update."
+        },
+        {
+          "RepositoryId": "winutil",
+          "ItemId": "file:functions/public/Invoke-WPFUpdatesdisable.ps1",
+          "Url": "https://github.com/ChrisTitusTech/winutil/blob/2f0bdc8fca52e1ebe31a8d98216428061d3f8956/functions/public/Invoke-WPFUpdatesdisable.ps1",
+          "Stance": "Disable",
+          "Note": "Oferece bloquear atualizações; a existência da opção não é recomendação universal."
+        },
+        {
+          "RepositoryId": "ultimate",
+          "ItemId": "file:2 Refresh/5 Updates Drivers Block.ps1",
+          "Url": "https://github.com/FR33THYFR33THY/Ultimate/blob/a0a33a57078434201f582b0db5107dcbb502292a/2%20Refresh/5%20Updates%20Drivers%20Block.ps1",
+          "Stance": "Disable",
+          "Note": "Oferece bloquear atualizações/drivers, com efeitos além de desempenho em jogos."
+        },
+        {
+          "RepositoryId": "rytunex",
+          "ItemId": "file:Helpers/OptimizeSystemHelper.cs",
+          "Url": "https://github.com/rayenghanmi/RyTuneX/blob/957885f53beaacfa7322581cafdb9eba5df5726a/Helpers/OptimizeSystemHelper.cs",
+          "Stance": "Review",
+          "Note": "Contém métodos SetWindowsUpdatesDefault, SecurityOnly, Manually e Disabled; o técnico deve distinguir os perfis."
+        }
+      ],
+      "Conflict": true
+    },
+    {
+      "Id": "services",
+      "Category": "Sistema",
+      "Title": "Serviços e tarefas do Windows",
+      "ProbeKey": "services",
+      "Evaluation": "Review",
+      "Recommendation": "Compare os serviços ativos com as funções usadas pelo cliente. Não desative listas inteiras por nome ou por estarem em execução; registre cada dependência e mantenha segurança, atualização, áudio, rede e impressão conforme necessidade.",
+      "Risk": "Alto",
+      "ActionId": "",
+      "Sources": [
+        {
+          "RepositoryId": "winutil",
+          "ItemId": "file:config/tweaks.json",
+          "Url": "https://github.com/ChrisTitusTech/winutil/blob/2f0bdc8fca52e1ebe31a8d98216428061d3f8956/config/tweaks.json",
+          "Stance": "Review",
+          "Note": "WPFTweaksServices configura uma lista selecionada como Manual; é diferente de desativar todos os serviços."
+        },
+        {
+          "RepositoryId": "ultimate",
+          "ItemId": "file:8 Advanced/17 Services.ps1",
+          "Url": "https://github.com/FR33THYFR33THY/Ultimate/blob/a0a33a57078434201f582b0db5107dcbb502292a/8%20Advanced/17%20Services.ps1",
+          "Stance": "Disable",
+          "Note": "Oferece conjuntos amplos de serviços/tarefas e etapas com RunOnce; não possui o diário transacional GOAT."
+        },
+        {
+          "RepositoryId": "winsux",
+          "ItemId": "file:WinSux/steptwo.ps1",
+          "Url": "https://github.com/FR33THYFR33THY/WinSux/blob/91adbfd63b7ed2eb5fcf0821fd53405a3cf63573/WinSux/steptwo.ps1",
+          "Stance": "Disable",
+          "Note": "Muda serviços/tarefas e componentes como parte de um fluxo abrangente, não de um diagnóstico individual."
+        },
+        {
+          "RepositoryId": "rytunex",
+          "ItemId": "file:Helpers/OptimizeSystemHelper.cs",
+          "Url": "https://github.com/rayenghanmi/RyTuneX/blob/957885f53beaacfa7322581cafdb9eba5df5726a/Helpers/OptimizeSystemHelper.cs",
+          "Stance": "Review",
+          "Note": "Oferece métodos de ativação/desativação de serviços como SysMain. Serviços devem ser avaliados por efeito real."
+        }
+      ]
+    },
+    {
+      "Id": "appx",
+      "Category": "Sistema",
+      "Title": "Apps UWP/AppX e componentes opcionais",
+      "ProbeKey": "appx",
+      "Evaluation": "Review",
+      "Recommendation": "Revise a lista e a conta do cliente antes de remover apps. Um pacote instalado não é prova de gargalo. Não remova Store, componentes de sessão, codecs ou dependências usadas; desinstalação exige recuperação própria e não é desfeita por um backup de Registro.",
+      "Risk": "Alto",
+      "ActionId": "",
+      "Sources": [
+        {
+          "RepositoryId": "winutil",
+          "ItemId": "file:functions/private/Remove-WinUtilAPPX.ps1",
+          "Url": "https://github.com/ChrisTitusTech/winutil/blob/2f0bdc8fca52e1ebe31a8d98216428061d3f8956/functions/private/Remove-WinUtilAPPX.ps1",
+          "Stance": "Review",
+          "Note": "Implementa remoção por pacotes selecionados, separada do inventário e instalação."
+        },
+        {
+          "RepositoryId": "winsux",
+          "ItemId": "file:WinSux/winsux.ps1",
+          "Url": "https://github.com/FR33THYFR33THY/WinSux/blob/91adbfd63b7ed2eb5fcf0821fd53405a3cf63573/WinSux/winsux.ps1",
+          "Stance": "Disable",
+          "Note": "Remove AppX em massa com lista de exceções. Esse comportamento é mais amplo que restringir atividade em segundo plano."
+        },
+        {
+          "RepositoryId": "ultimate",
+          "ItemId": "file:6 Windows/13 Bloatware.ps1",
+          "Url": "https://github.com/FR33THYFR33THY/Ultimate/blob/a0a33a57078434201f582b0db5107dcbb502292a/6%20Windows/13%20Bloatware.ps1",
+          "Stance": "Review",
+          "Note": "Menu de remoção de componentes e apps; exige revisar itens e dependências."
+        },
+        {
+          "RepositoryId": "rytunex",
+          "ItemId": "file:Views/DebloatSystemPage.xaml.cs",
+          "Url": "https://github.com/rayenghanmi/RyTuneX/blob/957885f53beaacfa7322581cafdb9eba5df5726a/Views/DebloatSystemPage.xaml.cs",
+          "Stance": "Review",
+          "Note": "Interface de seleção/remoção de apps; requer o aplicativo completo, não um script isolado."
+        }
+      ]
+    },
+    {
+      "Id": "cache",
+      "Category": "Sistema",
+      "Title": "Limpeza de cache e arquivos temporários",
+      "ProbeKey": "cache",
+      "Evaluation": "Review",
+      "Recommendation": "Meça espaço e escolha caches com finalidade conhecida. Limpar shader cache pode provocar recompilação e travamentos temporários; excluir dados não é uma otimização permanente nem possui reversão por Registro. Confira pastas do cliente antes de qualquer limpeza.",
+      "Risk": "Alto",
+      "ActionId": "",
+      "Sources": [
+        {
+          "RepositoryId": "winutil",
+          "ItemId": "file:config/tweaks.json",
+          "Url": "https://github.com/ChrisTitusTech/winutil/blob/2f0bdc8fca52e1ebe31a8d98216428061d3f8956/config/tweaks.json",
+          "Stance": "Review",
+          "Note": "WPFTweaksDeleteTempFiles apaga conteúdo de pastas TEMP; operação de exclusão, sem diário reversível de dados."
+        },
+        {
+          "RepositoryId": "ultimate",
+          "ItemId": "file:6 Windows/35 Cleanup.ps1",
+          "Url": "https://github.com/FR33THYFR33THY/Ultimate/blob/a0a33a57078434201f582b0db5107dcbb502292a/6%20Windows/35%20Cleanup.ps1",
+          "Stance": "Review",
+          "Note": "Apaga TEMP, cache de atualizações e outras pastas, inclusive Windows.old/XboxGames; revisão presencial é indispensável."
+        },
+        {
+          "RepositoryId": "rytunex",
+          "ItemId": "file:Helpers/DeepCleanEngine.cs",
+          "Url": "https://github.com/rayenghanmi/RyTuneX/blob/957885f53beaacfa7322581cafdb9eba5df5726a/Helpers/DeepCleanEngine.cs",
+          "Stance": "Review",
+          "Note": "Implementa limpeza de categorias de cache. Requer revisar escopo e arquivos em uso."
+        }
+      ]
+    },
+    {
+      "Id": "explorer",
+      "Category": "Sistema",
+      "Title": "Resposta e preferências do Explorer",
+      "ProbeKey": "explorer",
+      "Evaluation": "Review",
+      "Recommendation": "Revise detecção de tipo de pasta, navegação e efeitos visuais conforme o sintoma. Travamento do Explorer requer identificar extensão, armazenamento ou pasta problemática; preferências cosméticas não demonstram aumento de FPS.",
+      "Risk": "Moderado",
+      "ActionId": "",
+      "Sources": [
+        {
+          "RepositoryId": "winutil",
+          "ItemId": "file:config/tweaks.json",
+          "Url": "https://github.com/ChrisTitusTech/winutil/blob/2f0bdc8fca52e1ebe31a8d98216428061d3f8956/config/tweaks.json",
+          "Stance": "Review",
+          "Note": "WPFTweaksDisableExplorerAutoDiscovery usa FolderType=NotSpecified para evitar inferência de tipos de pasta."
+        },
+        {
+          "RepositoryId": "rytunex",
+          "ItemId": "file:Helpers/OptimizeSystemHelper.cs",
+          "Url": "https://github.com/rayenghanmi/RyTuneX/blob/957885f53beaacfa7322581cafdb9eba5df5726a/Helpers/OptimizeSystemHelper.cs",
+          "Stance": "Review",
+          "Note": "Contém preferências do Explorer e limpezas que reiniciam explorer.exe. Reinício da shell interrompe a sessão visual."
+        }
+      ]
+    },
+    {
+      "Id": "drivers",
+      "Category": "Drivers",
+      "Title": "Drivers de GPU, chipset, rede e armazenamento",
+      "ProbeKey": "drivers",
+      "Evaluation": "Review",
+      "Recommendation": "Confira dispositivo, versão, assinatura, pacote e suporte oficial. Data antiga não prova defeito; driver mais novo pode exigir validação da carga. DDU e reinstalação são procedimentos de manutenção com possível reinício, sem reversão automática pelo GOAT.",
+      "Risk": "Alto",
+      "ActionId": "",
+      "Sources": [
+        {
+          "RepositoryId": "ultimate",
+          "ItemId": "file:5 Graphics/1 Driver Clean.ps1",
+          "Url": "https://github.com/FR33THYFR33THY/Ultimate/blob/a0a33a57078434201f582b0db5107dcbb502292a/5%20Graphics/1%20Driver%20Clean.ps1",
+          "Stance": "Review",
+          "Note": "Executa fluxo DDU e pode usar Safe Boot/RunOnce; não é uma simples atualização de Registro."
+        },
+        {
+          "RepositoryId": "ultimate",
+          "ItemId": "file:5 Graphics/2 Driver Updated Install.ps1",
+          "Url": "https://github.com/FR33THYFR33THY/Ultimate/blob/a0a33a57078434201f582b0db5107dcbb502292a/5%20Graphics/2%20Driver%20Updated%20Install.ps1",
+          "Stance": "Review",
+          "Note": "Oferece instalação de driver gráfico atualizado; pacote e compatibilidade precisam de conferência."
+        },
+        {
+          "RepositoryId": "winsux",
+          "ItemId": "file:WinSux/stepone.ps1",
+          "Url": "https://github.com/FR33THYFR33THY/WinSux/blob/91adbfd63b7ed2eb5fcf0821fd53405a3cf63573/WinSux/stepone.ps1",
+          "Stance": "Review",
+          "Note": "Etapa dependente do fluxo executa DDU para GPU/áudio e reinicia. Não iniciar isoladamente."
+        },
+        {
+          "RepositoryId": "winutil",
+          "ItemId": "file:config/applications.json",
+          "Url": "https://github.com/ChrisTitusTech/winutil/blob/2f0bdc8fca52e1ebe31a8d98216428061d3f8956/config/applications.json",
+          "Stance": "Reference",
+          "Note": "Catálogo inclui utilitários de manutenção/instalação de drivers, sem provar que um pacote específico é adequado ao hardware detectado."
+        }
+      ]
+    }
+  ]
+}

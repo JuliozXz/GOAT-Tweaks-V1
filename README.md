@@ -1,4 +1,4 @@
-# GOAT Tweaks v2.2
+# GOAT Tweaks v2.3
 
 Aplicativo desktop para a bancada técnica GOAT, escrito em Windows PowerShell 5.1 e WPF. Este projeto começa do zero, em pasta própria. A interface e o scanner funcionam sem instalar Node, Python, .NET adicional ou módulos da PowerShell Gallery.
 
@@ -10,7 +10,7 @@ Abra o **Windows PowerShell como administrador** e execute:
 irm 'https://raw.githubusercontent.com/JuliozXz/GOAT-Tweaks-V1/main/dist/GOAT-Tweaks.ps1' | iex
 ```
 
-O comando abre a interface e analisa a máquina; as alterações só começam quando o técnico seleciona as opções e clica em aplicar. Sem elevação, o diagnóstico continua disponível. O repositório mantém o nome `GOAT-Tweaks-V1`, e o aplicativo publicado é a versão **2.2**.
+O comando abre a interface e analisa a máquina; as alterações só começam quando o técnico seleciona as opções e clica em aplicar. Sem elevação, o diagnóstico continua disponível. O repositório mantém o nome `GOAT-Tweaks-V1`, e o aplicativo publicado é a versão **2.3**.
 
 ## Abrir
 
@@ -31,15 +31,52 @@ O executável de PowerShell 7 relança automaticamente o script salvo usando Win
 
 ## Recursos implementados
 
+- Logo GOAT original no topo e tema preto/grafite com detalhes dourados.
+- Quatro categorias visíveis de projetos: Winutil, WinSux, Ultimate e RyTuneX. O catálogo inclui **1.330 itens**, com busca, filtro por pasta/tipo, código-fonte, scripts, executáveis de releases e recursos dos aplicativos.
 - Interface escura com navegação por categoria, estados de permissão e checklist revisável.
 - Scanner em segundo plano: CPU, núcleos/threads, GPU, configuração MSI declarada pelo driver, prioridade declarada, RAM, placa-mãe, BIOS, Windows, rede, plano de energia e inventário de drivers.
 - Histórico de utilização de CPU/GPU/RAM nos últimos 60 segundos, conforme disponibilidade dos provedores do Windows. GPU mostra o maior uso de motor 3D observado, não uma média entre motores. Ausência de dados aparece como indisponível.
 - Detecção por nomes conhecidos de processos de jogos; a lista não é universal e não injeta nada no jogo.
-- Oito opções transacionais: Modo de Jogo, captura em segundo plano, efeitos visuais, aceleração do ponteiro, apps UWP em segundo plano, plano Alto Desempenho existente, auto-tuning TCP do perfil Internet e RSS global.
+- Nove opções transacionais: compressão de memória, Modo de Jogo, captura em segundo plano, efeitos visuais, aceleração do ponteiro, apps UWP em segundo plano, plano Alto Desempenho existente, auto-tuning TCP do perfil Internet e RSS global.
+- Análise cruzada em segundo plano por RAM, CPU, GPU, BIOS, rede, sistema e drivers. Uma matriz revisada associa as leituras do Windows às fontes dos quatro projetos, elimina recomendações duplicadas e identifica divergências.
 - Links oficiais de ferramentas e drivers. O aplicativo abre a página; a instalação continua sob acompanhamento do técnico.
 - Registro de comandos/valores alterados, backup dos valores e tipos originais, verificação após cada escrita, reversão em falha e retomada da restauração de operações interrompidas.
 
-As duas sugestões iniciais de preferências de jogos só são selecionadas quando seus valores ainda não estão configurados. Revise a captura caso o cliente use gravação de clipes. Não são uma previsão de ganho de FPS. Os demais ajustes ficam desmarcados.
+As duas sugestões de preferências de jogos só são selecionadas quando seus valores ainda não estão configurados. A compressão de memória é sugerida quando a leitura confirma que está desativada; o estado desconhecido bloqueia sua aplicação. Revise a captura caso o cliente use gravação de clipes. Não são uma previsão de ganho de FPS.
+
+## Análise cruzada por área
+
+O scanner apresenta **Recomendado**, **Configurado**, **Revisão manual** ou **Indisponível**, acompanhado do estado atual, motivo e links das fontes. Uma consulta que falha não equivale a recurso desativado. O diagnóstico usa uma matriz revisada distribuída com o aplicativo; não executa scripts baixados nem faz pesquisa automática na internet enquanto analisa o cliente.
+
+| Área | Leituras e decisão |
+| --- | --- |
+| RAM | Compressão pelo MMAgent e preferência de cache. Ativação da compressão disponível com proteção, verificação e restauração do valor anterior. |
+| CPU | Arquitetura, núcleos/threads, estacionamento no plano ativo e prioridade configurada. C-States dependem de firmware; não são inferidos pelo nome do processador. |
+| GPU | MSI e prioridade declarados pelo driver, preferência HAGS e revisão de ReBAR. Preferência de Registro não prova suporte nem estado efetivo em execução. |
+| Placa-mãe/BIOS | Controladores, MSI declarado e flags de timers no boot. Nenhum ajuste universal de HPET ou latência DPC é aplicado. |
+| Rede | TCP Internet, RSS, políticas QoS e energia do adaptador. TCP Normal e RSS têm ações nativas revisáveis; buffers e energia exigem compatibilidade e comparação de carga. |
+| Sistema/drivers | Windows Update, serviços, UWP do usuário, inventário limitado de TEMP, preferências do Explorer e drivers. Limpeza e remoções seguem procedimentos revisados dos aplicativos originais. |
+
+A mesma configuração aparece uma vez, com todas as fontes correspondentes. Quando os projetos divergem, o aplicativo informa o conflito. Veja [a matriz e os critérios de recomendação](docs/RECOMENDACOES.md). A melhor configuração depende do hardware, da carga e da medição; o scanner não inventa ganhos de FPS, DPC ou input lag.
+
+## Projetos originais visíveis
+
+| Categoria | Conteúdo no catálogo |
+| --- | --- |
+| Winutil | 389 arquivos, 1 launcher oficial de release e 397 itens dos catálogos de aplicações, ajustes, recursos, DNS e predefinições. |
+| WinSux | 8 arquivos, incluindo o fluxo principal e seus auxiliares, mais 16 executáveis publicados pelo autor. |
+| Ultimate | 108 arquivos preservados nas pastas originais, incluindo 105 scripts PowerShell, e 59 executáveis/pacotes de releases. |
+| RyTuneX | 200 arquivos, 151 recursos/páginas identificados no projeto e acesso oficial pela Microsoft Store. |
+
+Cada item informa sua origem e oferece as ações compatíveis com seu formato: **Ver origem**, **Baixar** e **Executar**. Funções internas, arquivos C#/XAML e recursos dependentes do aplicativo permanecem visíveis para consulta. Eles são usados dentro do programa original; o catálogo não os apresenta como scripts independentes. WinSux deve começar pelo fluxo principal, pois seus auxiliares dependem das etapas anteriores. ZIP e APPX podem ser baixados para o procedimento original de instalação.
+
+A execução de scripts e instaladores exige administração, revisão do item escolhido e um ponto GOAT confirmado nas últimas 24 horas; se não houver, o aplicativo tenta criar e verificar um. Falha na proteção bloqueia a execução. A Microsoft Store abre diretamente sua página oficial e não inicia uma instalação silenciosa.
+
+Arquivos são obtidos dos repositórios/releases oficiais, com verificação de Git blob SHA ou SHA256. Para executar scripts do repositório, o GOAT prepara a árvore completa do commit catalogado e verifica todos os arquivos. Scripts, executáveis e instaladores abrem em processos separados, com as pastas originais e sem parâmetros de instalação silenciosa. Downloads ficam em `D:\GoatTweaks\tools\` ou `%ProgramData%\GoatTweaks\tools\`, separados por projeto e versão.
+
+**As alterações feitas pelos programas externos não pertencem ao diário de reversão do GOAT.** Cada programa mantém seu próprio comportamento; alguns fazem downloads adicionais, alteram proteções ou reiniciam o Windows. A tela de revisão apresenta os avisos do item. Fixar o launcher por commit/hash não fixa os downloads que o próprio launcher faz depois.
+
+O catálogo representa as revisões verificadas em 26/10/2026. Os snapshots de desenvolvimento ficam em `artifacts/` e não são publicados. `scripts/Build-Catalog.ps1` regenera o catálogo a partir desses snapshots revisados; o aplicativo não executa nem atualiza scripts externos ao iniciar.
 
 ## Proteção e reversão
 
@@ -62,9 +99,9 @@ O alvo de execução é Windows 10/11 cliente x64, build 19041 ou superior. A ve
 
 C-States, afinidade universal, ReBAR, MSI/HAGS, HPET, BCD e timers aparecem como diagnóstico/orientação quando aplicável. Suporte do driver, configuração de firmware e latência DPC não podem ser provados por fabricante, uma chave de Registro ou utilização instantânea. Não existe pontuação fictícia de otimização nem promessa de FPS/input lag. Não há alteração automática dessas opções.
 
-O módulo Sistema oferece restrição reversível de atividade UWP. Desinstalação em massa de apps, exclusão de caches, bloqueio de Windows Update, desativação indiscriminada de serviços e offloads não estão implementados: não possuem reversão equivalente por um backup de Registro e exigem fluxos específicos. Windows Update permanece acessível pela área de ferramentas.
+O módulo nativo Sistema oferece restrição reversível de atividade UWP. Desinstalação em massa de apps, exclusão de caches, bloqueio de Windows Update, desativação indiscriminada de serviços e offloads não são ajustes nativos do GOAT: não possuem reversão equivalente por um backup de Registro. Esses procedimentos podem existir nos projetos externos e seguem as regras e etapas desses aplicativos. Windows Update permanece acessível pela área de ferramentas.
 
-As referências foram estudadas, sem incorporar código de terceiros. Consulte [as decisões e fontes técnicas](docs/REFERENCIAS.md). Não há autenticação de técnicos: o perfil “Técnico GOAT” é identidade visual, e a autorização efetiva vem da sessão local do Windows.
+O código do GOAT é próprio. As quatro categorias mantêm a origem e a licença de cada projeto; arquivos de terceiros são obtidos diretamente da publicação original quando o técnico solicita. Consulte [as decisões e fontes técnicas](docs/REFERENCIAS.md). Não há autenticação de técnicos: o perfil “Técnico GOAT” é identidade visual, e a autorização efetiva vem da sessão local do Windows.
 
 ## Build e distribuição
 
@@ -72,7 +109,7 @@ As referências foram estudadas, sem incorporar código de terceiros. Consulte [
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Build.ps1
 ```
 
-Saídas: `dist\GOAT-Tweaks.ps1` independente, `dist\GOAT-Tweaks.sha256` e `dist\GOAT-Tweaks-v2.2.zip`. O arquivo independente inclui scanner, engine e XAML, sem baixar dependências ou executar utilitários de terceiros. O transporte gerado é ASCII sem BOM, com recursos UTF-8 codificados em Base64 e decodificados em memória. Isso preserva os textos em português no `irm | iex` do PowerShell 5.1 mesmo quando o servidor não envia charset. O código legível de cada módulo está em `src/`.
+Saídas: `dist\GOAT-Tweaks.ps1` independente, `dist\GOAT-Tweaks.sha256` e `dist\GOAT-Tweaks-v2.3.zip`. O arquivo independente inclui scanner, engine, XAML, logo e catálogo. O transporte gerado é ASCII sem BOM, com recursos UTF-8 codificados em Base64 e catálogo comprimido em GZip, decodificados em memória. Isso preserva os textos em português no `irm | iex` do PowerShell 5.1 mesmo quando o servidor não envia charset. O código legível de cada módulo está em `src/`.
 
 O endereço publicado aponta diretamente para **o arquivo gerado**, que não depende dos arquivos locais de `src/`:
 
@@ -87,6 +124,9 @@ Execute esse comando no Windows PowerShell 5.1 x64. O endereço `main` acompanha
 ```powershell
 powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -File .\tests\Test-Core.ps1
 powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -File .\tests\Test-UI.ps1
+powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -File .\tests\Test-Integrations.ps1
+powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -File .\tests\Test-AdvancedScanner.ps1
+powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -File .\tests\Test-Recommendations.ps1
 ```
 
 Os testes da engine substituem as APIs de alteração e os checkpoints por simuladores em memória. O teste de UI usa demonstração para verificar navegação, gráfico, aplicação simulada e restauração simulada, e gera capturas em `artifacts\`. Testes não aplicam tweaks reais. O parâmetro `-RealReadOnly` verifica a UI com consultas reais, e `-Bundle` verifica a versão independente. Consulte [o relatório de validação](docs/VALIDACAO.md).

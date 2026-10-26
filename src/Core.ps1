@@ -101,6 +101,12 @@ function Get-GoatTcpAutoTuning {
     return $value
 }
 
+function Get-GoatMemoryCompression {
+    $agent=Get-MMAgent -ErrorAction Stop
+    if ($null -eq $agent -or $agent.MemoryCompression -isnot [bool]) { throw 'Estado de compressão de memória indisponível.' }
+    return [bool]$agent.MemoryCompression
+}
+
 function Get-GoatTweaks {
     param([Parameter(Mandatory=$true)]$Scan)
     $list = New-Object System.Collections.Generic.List[object]
@@ -137,6 +143,7 @@ function Get-GoatTweaks {
     }
     $powerId = '8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c'
     $extras = @(
+        @{Id='memory-compression';Category='RAM';Title='Ativar compressão de memória';Description='Ativa somente Memory Compression pelo MMAgent. Revise a carga e compare paginação/uso de CPU; não garante ganho em jogos. O estado anterior é salvo para desfazer.';Kind='MemoryCompression';Target=$true;Restart=$true;Risk='Moderado'},
         @{Id='power-high';Category='CPU';Title='Selecionar plano Alto Desempenho';Description='Usa o plano existente do Windows. Pode aumentar consumo, temperatura e ruído; compare antes/depois. Não altera C-States no firmware.';Kind='Power';Target=$powerId;Restart=$false;Risk='Moderado'},
         @{Id='tcp-normal';Category='Rede';Title='Auto-tuning TCP Internet para Normal';Description='Define Normal apenas no perfil TCP Internet, preservando os demais perfis. Afeta throughput, sem promessa de redução de ping. Não substitui diagnóstico de rede.';Kind='Tcp';Target='normal';Restart=$false;Risk='Moderado'},
         @{Id='rss-on';Category='Rede';Title='Habilitar RSS global';Description='Permite distribuir processamento de recepção em NICs compatíveis. Mantém offloads de checksum e LSO. Não altera propriedades específicas do fabricante.';Kind='Rss';Target='Enabled';Restart=$false;Risk='Moderado'}
@@ -144,9 +151,18 @@ function Get-GoatTweaks {
     foreach ($definition in $extras) {
         $available = [bool]$Scan.OS.Supported; $reason=''; $applied=$false
         if (-not $available) { $reason='Windows não suportado.' }
+        if ($Scan.IsDemo -and $definition.Kind -in @('MemoryCompression','Tcp','Rss') -and $Scan.AdvancedState) {
+            $probeKey=@{MemoryCompression='memory-compression';Tcp='network-autotuning';Rss='rss'}[$definition.Kind]
+            $reading=$null
+            if ($Scan.AdvancedState.Readings -is [Collections.IDictionary]) { $reading=$Scan.AdvancedState.Readings[$probeKey] }
+            else { $property=$Scan.AdvancedState.Readings.PSObject.Properties[$probeKey]; if ($property) { $reading=$property.Value } }
+            if ($reading.Available -and (($definition.Kind -eq 'MemoryCompression' -and $reading.Value -is [bool]) -or ($definition.Kind -ne 'MemoryCompression' -and $reading.Value -is [string]))) { $applied=$reading.Value -eq $definition.Target }
+            else { $available=$false; $reason='Estado demonstrativo indisponível.' }
+        }
         if (-not $Scan.IsDemo -and $available) {
             try {
                 switch ($definition.Kind) {
+                    'MemoryCompression' { $applied=Get-GoatMemoryCompression; Get-Command Enable-MMAgent,Disable-MMAgent -ErrorAction Stop | Out-Null }
                     'Power' {
                         $plans = Invoke-GoatNative "$env:SystemRoot\System32\powercfg.exe" @('/list')
                         if ($plans -notmatch $powerId) { $available=$false; $reason='Plano não oferecido por este computador (comum em Modern Standby). Nenhum plano será criado.' }
@@ -158,7 +174,7 @@ function Get-GoatTweaks {
             } catch { $available=$false; $reason=$_.Exception.Message }
         }
         $status='Disponível'; if ($applied) {$status='Aplicado'}; if (-not $available) {$status='Indisponível'}
-        $list.Add([pscustomobject]@{Id=$definition.Id;Category=$definition.Category;Title=$definition.Title;Description=$definition.Description;Risk=$definition.Risk;Recommended=$false;Available=$available;UnavailableReason=$reason;RequiresRestart=$definition.Restart;State=$status;Kind=$definition.Kind;Target=$definition.Target;Targets=@()})
+        $list.Add([pscustomobject]@{Id=$definition.Id;Category=$definition.Category;Title=$definition.Title;Description=$definition.Description;Risk=$definition.Risk;Recommended=($definition.Kind -eq 'MemoryCompression' -and $available -and -not $applied);Available=$available;UnavailableReason=$reason;RequiresRestart=$definition.Restart;State=$status;Kind=$definition.Kind;Target=$definition.Target;Targets=@()})
     }
     return $list.ToArray()
 }
@@ -214,6 +230,7 @@ function Get-GoatStepOriginal {
             return $state
         }
         'Power' { return (Get-GoatActivePowerScheme) }
+        'MemoryCompression' { return (Get-GoatMemoryCompression) }
         'Tcp' { return (Get-GoatTcpAutoTuning) }
         'Rss' {
             $value = [string](Get-NetOffloadGlobalSetting -ErrorAction Stop).ReceiveSideScaling
@@ -227,6 +244,17 @@ function Get-GoatStepOriginal {
 function Set-GoatStepValue {
     param($Step, $Value, [string]$LogPath)
     switch ($Step.Kind) {
+        'MemoryCompression' {
+            if ($Value -isnot [bool]) { throw 'Estado de compressão inválido no diário.' }
+            if ($Value) {
+                Write-GoatLog $LogPath 'COMMAND Enable-MMAgent -MemoryCompression'
+                Enable-MMAgent -MemoryCompression -ErrorAction Stop | Out-Null
+            } else {
+                Write-GoatLog $LogPath 'COMMAND Disable-MMAgent -MemoryCompression'
+                Disable-MMAgent -MemoryCompression -ErrorAction Stop | Out-Null
+            }
+            if ((Get-GoatMemoryCompression) -ne $Value) { throw 'Compressão de memória não confirmada.' }
+        }
         'Registry' {
             Write-GoatLog $LogPath ('REGISTRY ' + ($Value | ConvertTo-Json -Compress -Depth 6))
             Set-GoatRegistryState $Value

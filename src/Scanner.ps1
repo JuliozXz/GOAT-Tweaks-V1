@@ -143,7 +143,7 @@ function Get-GoatHardwareScan {
     $clockSpeeds = @($ramModules | ForEach-Object { if ($_.ConfiguredClockSpeed -gt 0) { [int]$_.ConfiguredClockSpeed } elseif ($_.Speed -gt 0) { [int]$_.Speed } })
     if ($clockSpeeds.Count -gt 0) { $speedMHz = ($clockSpeeds | Measure-Object -Maximum).Maximum }
     if ($null -ne $totalGB -and $totalGB -gt 0 -and $null -ne $availableGB -and ($availableGB / $totalGB) -lt 0.15) {
-        $findings.Add([pscustomobject]@{ Category = 'CPU'; Severity = 'Warning'; Title = 'Pouca memória RAM disponível'; Detail = ('{0} GB disponíveis de {1} GB nesta amostra. Examine a carga e o uso de paginação antes de recomendar hardware.' -f $availableGB, $totalGB) })
+        $findings.Add([pscustomobject]@{ Category = 'RAM'; Severity = 'Warning'; Title = 'Pouca memória RAM disponível'; Detail = ('{0} GB disponíveis de {1} GB nesta amostra. Examine a carga e o uso de paginação antes de recomendar hardware.' -f $availableGB, $totalGB) })
     }
 
     $build = $null
