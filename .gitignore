@@ -1,0 +1,8 @@
+artifacts/
+*.log
+*.tmp
+docs/Especificacao-original.txt
+docs/CONTRACT.md
+dist/package/
+dist/*.zip
+*.previous
