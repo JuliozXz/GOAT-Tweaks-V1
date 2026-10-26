@@ -1,0 +1,1069 @@
+{
+  "SchemaVersion": 1,
+  "ReviewedAt": "2026-10-26",
+  "Options": [
+    {
+      "Id": "file-extensions",
+      "Category": "Sistema",
+      "Title": "Extensões de arquivos no Explorer",
+      "Description": "Exibe extensões como .exe, .png e .txt. Facilita identificar tipos de arquivo; não altera associações nem aumenta FPS.",
+      "Risk": "Baixo",
+      "RequiresRestart": true,
+      "MinBuild": 19041,
+      "SelectionPolicy": "Manual",
+      "OnTargets": [
+        {
+          "Path": "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced",
+          "Name": "HideFileExt",
+          "Exists": true,
+          "KeyExisted": true,
+          "Value": 0,
+          "Type": "DWord"
+        }
+      ],
+      "OffTargets": [
+        {
+          "Path": "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced",
+          "Name": "HideFileExt",
+          "Exists": true,
+          "KeyExisted": true,
+          "Value": 1,
+          "Type": "DWord"
+        }
+      ],
+      "OnLabel": "Ativar",
+      "OffLabel": "Desativar",
+      "Sources": [
+        {
+          "RepositoryId": "winutil",
+          "ItemId": "file:config/tweaks.json",
+          "Url": "https://github.com/ChrisTitusTech/winutil/blob/2f0bdc8fca52e1ebe31a8d98216428061d3f8956/config/tweaks.json",
+          "Note": "WPFToggleShowExt usa HideFileExt=0 para mostrar e 1 para ocultar."
+        },
+        {
+          "RepositoryId": "rytunex",
+          "ItemId": "file:Helpers/OptimizeSystemHelper.cs",
+          "Url": "https://github.com/rayenghanmi/RyTuneX/blob/957885f53beaacfa7322581cafdb9eba5df5726a/Helpers/OptimizeSystemHelper.cs",
+          "Note": "ShowFileExtensionsAndHiddenFiles/HideFileExtensionsAndHiddenFiles usam 0/1 para HideFileExt."
+        }
+      ],
+      "Benefit": "Interface"
+    },
+    {
+      "Id": "hidden-files",
+      "Category": "Sistema",
+      "Title": "Arquivos ocultos no Explorer",
+      "Description": "Mostra arquivos marcados como ocultos. Não inclui a opção de exibir arquivos protegidos do sistema. Preferência de visualização para o técnico.",
+      "Risk": "Baixo",
+      "RequiresRestart": true,
+      "MinBuild": 19041,
+      "SelectionPolicy": "Manual",
+      "OnTargets": [
+        {
+          "Path": "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced",
+          "Name": "Hidden",
+          "Exists": true,
+          "KeyExisted": true,
+          "Value": 1,
+          "Type": "DWord"
+        }
+      ],
+      "OffTargets": [
+        {
+          "Path": "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced",
+          "Name": "Hidden",
+          "Exists": true,
+          "KeyExisted": true,
+          "Value": 2,
+          "Type": "DWord"
+        }
+      ],
+      "OnLabel": "Ativar",
+      "OffLabel": "Desativar",
+      "Sources": [
+        {
+          "RepositoryId": "rytunex",
+          "ItemId": "file:Helpers/OptimizeSystemHelper.cs",
+          "Url": "https://github.com/rayenghanmi/RyTuneX/blob/957885f53beaacfa7322581cafdb9eba5df5726a/Helpers/OptimizeSystemHelper.cs",
+          "Note": "ShowFileExtensionsAndHiddenFiles usa Hidden=1; a opção de ocultar usa Hidden=2."
+        }
+      ],
+      "Benefit": "Interface"
+    },
+    {
+      "Id": "explorer-this-pc",
+      "Category": "Sistema",
+      "Title": "Explorer abre em Este Computador",
+      "Description": "Define Este Computador como destino inicial. Usar padrão remove somente essa preferência; a página inicial passa a ser escolhida pelo Windows.",
+      "Risk": "Baixo",
+      "RequiresRestart": true,
+      "MinBuild": 19041,
+      "SelectionPolicy": "Manual",
+      "OnTargets": [
+        {
+          "Path": "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced",
+          "Name": "LaunchTo",
+          "Exists": true,
+          "KeyExisted": true,
+          "Value": 1,
+          "Type": "DWord"
+        }
+      ],
+      "OffTargets": [
+        {
+          "Path": "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced",
+          "Name": "LaunchTo",
+          "Exists": false,
+          "KeyExisted": true,
+          "Value": null,
+          "Type": "DWord"
+        }
+      ],
+      "OnLabel": "Aplicar",
+      "OffLabel": "Usar padrão",
+      "Sources": [
+        {
+          "RepositoryId": "winutil",
+          "ItemId": "file:config/tweaks.json",
+          "Url": "https://github.com/ChrisTitusTech/winutil/blob/2f0bdc8fca52e1ebe31a8d98216428061d3f8956/config/tweaks.json",
+          "Note": "LaunchTo=1 e reversão RemoveEntry no ajuste Home/Gallery; aqui somente LaunchTo é alterado."
+        },
+        {
+          "RepositoryId": "rytunex",
+          "ItemId": "file:Helpers/OptimizeSystemHelper.cs",
+          "Url": "https://github.com/rayenghanmi/RyTuneX/blob/957885f53beaacfa7322581cafdb9eba5df5726a/Helpers/OptimizeSystemHelper.cs",
+          "Note": "Preferências do Explorer incluem LaunchTo=1 e retorno para 2."
+        }
+      ],
+      "Benefit": "Interface"
+    },
+    {
+      "Id": "explorer-compact-view",
+      "Category": "Sistema",
+      "Title": "Visualização compacta do Explorer",
+      "Description": "Reduz o espaçamento entre itens no Explorer do Windows 11. Preferência visual; não é ajuste de hardware.",
+      "Risk": "Baixo",
+      "RequiresRestart": true,
+      "MinBuild": 22000,
+      "SelectionPolicy": "Manual",
+      "OnTargets": [
+        {
+          "Path": "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced",
+          "Name": "UseCompactMode",
+          "Exists": true,
+          "KeyExisted": true,
+          "Value": 1,
+          "Type": "DWord"
+        }
+      ],
+      "OffTargets": [
+        {
+          "Path": "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced",
+          "Name": "UseCompactMode",
+          "Exists": true,
+          "KeyExisted": true,
+          "Value": 0,
+          "Type": "DWord"
+        }
+      ],
+      "OnLabel": "Ativar",
+      "OffLabel": "Desativar",
+      "Sources": [
+        {
+          "RepositoryId": "rytunex",
+          "ItemId": "file:Helpers/OptimizeSystemHelper.cs",
+          "Url": "https://github.com/rayenghanmi/RyTuneX/blob/957885f53beaacfa7322581cafdb9eba5df5726a/Helpers/OptimizeSystemHelper.cs",
+          "Note": "EnableCompactMode/DisableCompactMode escrevem UseCompactMode=1/0."
+        }
+      ],
+      "Benefit": "Interface"
+    },
+    {
+      "Id": "explorer-recent-files",
+      "Category": "Sistema",
+      "Title": "Arquivos recentes na página inicial",
+      "Description": "Mostra arquivos recentes no Acesso Rápido/página inicial do Explorer. Desativar oculta essa lista; não exclui documentos.",
+      "Risk": "Baixo",
+      "RequiresRestart": true,
+      "MinBuild": 19041,
+      "SelectionPolicy": "Manual",
+      "OnTargets": [
+        {
+          "Path": "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer",
+          "Name": "ShowRecent",
+          "Exists": true,
+          "KeyExisted": true,
+          "Value": 1,
+          "Type": "DWord"
+        }
+      ],
+      "OffTargets": [
+        {
+          "Path": "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer",
+          "Name": "ShowRecent",
+          "Exists": true,
+          "KeyExisted": true,
+          "Value": 0,
+          "Type": "DWord"
+        }
+      ],
+      "OnLabel": "Ativar",
+      "OffLabel": "Desativar",
+      "Sources": [
+        {
+          "RepositoryId": "rytunex",
+          "ItemId": "file:Helpers/OptimizeSystemHelper.cs",
+          "Url": "https://github.com/rayenghanmi/RyTuneX/blob/957885f53beaacfa7322581cafdb9eba5df5726a/Helpers/OptimizeSystemHelper.cs",
+          "Note": "Preferências do Explorer definem ShowRecent=0/1."
+        }
+      ],
+      "Benefit": "Privacidade"
+    },
+    {
+      "Id": "explorer-frequent-folders",
+      "Category": "Sistema",
+      "Title": "Pastas frequentes na página inicial",
+      "Description": "Mostra pastas frequentes no Acesso Rápido/página inicial do Explorer. Desativar muda a apresentação da lista; não remove pastas.",
+      "Risk": "Baixo",
+      "RequiresRestart": true,
+      "MinBuild": 19041,
+      "SelectionPolicy": "Manual",
+      "OnTargets": [
+        {
+          "Path": "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer",
+          "Name": "ShowFrequent",
+          "Exists": true,
+          "KeyExisted": true,
+          "Value": 1,
+          "Type": "DWord"
+        }
+      ],
+      "OffTargets": [
+        {
+          "Path": "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer",
+          "Name": "ShowFrequent",
+          "Exists": true,
+          "KeyExisted": true,
+          "Value": 0,
+          "Type": "DWord"
+        }
+      ],
+      "OnLabel": "Ativar",
+      "OffLabel": "Desativar",
+      "Sources": [
+        {
+          "RepositoryId": "rytunex",
+          "ItemId": "file:Helpers/OptimizeSystemHelper.cs",
+          "Url": "https://github.com/rayenghanmi/RyTuneX/blob/957885f53beaacfa7322581cafdb9eba5df5726a/Helpers/OptimizeSystemHelper.cs",
+          "Note": "Preferências do Explorer definem ShowFrequent=0/1."
+        }
+      ],
+      "Benefit": "Privacidade"
+    },
+    {
+      "Id": "copy-dialog-details",
+      "Category": "Sistema",
+      "Title": "Detalhes na janela de transferência",
+      "Description": "Prefere a visualização detalhada ao copiar ou mover arquivos. Não aumenta a velocidade da unidade de armazenamento.",
+      "Risk": "Baixo",
+      "RequiresRestart": true,
+      "MinBuild": 19041,
+      "SelectionPolicy": "Manual",
+      "OnTargets": [
+        {
+          "Path": "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\OperationStatusManager",
+          "Name": "EnthusiastMode",
+          "Exists": true,
+          "KeyExisted": true,
+          "Value": 1,
+          "Type": "DWord"
+        }
+      ],
+      "OffTargets": [
+        {
+          "Path": "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\OperationStatusManager",
+          "Name": "EnthusiastMode",
+          "Exists": true,
+          "KeyExisted": true,
+          "Value": 0,
+          "Type": "DWord"
+        }
+      ],
+      "OnLabel": "Ativar",
+      "OffLabel": "Desativar",
+      "Sources": [
+        {
+          "RepositoryId": "rytunex",
+          "ItemId": "file:Helpers/OptimizeSystemHelper.cs",
+          "Url": "https://github.com/rayenghanmi/RyTuneX/blob/957885f53beaacfa7322581cafdb9eba5df5726a/Helpers/OptimizeSystemHelper.cs",
+          "Note": "O par de preferências do Explorer usa EnthusiastMode=1/0."
+        }
+      ],
+      "Benefit": "Interface"
+    },
+    {
+      "Id": "taskbar-animations",
+      "Category": "Sistema",
+      "Title": "Animações da barra de tarefas",
+      "Description": "Ativa ou desativa animações compatíveis da barra de tarefas. Em máquinas com pouca RAM, o scanner pode sugerir desativar apenas para simplificar a interface; isso não prevê ganho em jogos.",
+      "Risk": "Baixo",
+      "RequiresRestart": true,
+      "MinBuild": 19041,
+      "SelectionPolicy": "LowMemory",
+      "OnTargets": [
+        {
+          "Path": "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced",
+          "Name": "TaskbarAnimations",
+          "Exists": true,
+          "KeyExisted": true,
+          "Value": 1,
+          "Type": "DWord"
+        }
+      ],
+      "OffTargets": [
+        {
+          "Path": "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced",
+          "Name": "TaskbarAnimations",
+          "Exists": true,
+          "KeyExisted": true,
+          "Value": 0,
+          "Type": "DWord"
+        }
+      ],
+      "OnLabel": "Ativar",
+      "OffLabel": "Desativar",
+      "Sources": [
+        {
+          "RepositoryId": "winutil",
+          "ItemId": "file:config/tweaks.json",
+          "Url": "https://github.com/ChrisTitusTech/winutil/blob/2f0bdc8fca52e1ebe31a8d98216428061d3f8956/config/tweaks.json",
+          "Note": "WPFTweaksDisplay usa TaskbarAnimations=0 e OriginalValue=1."
+        },
+        {
+          "RepositoryId": "winsux",
+          "ItemId": "file:WinSux/reg.reg",
+          "Url": "https://github.com/FR33THYFR33THY/WinSux/blob/91adbfd63b7ed2eb5fcf0821fd53405a3cf63573/WinSux/reg.reg",
+          "Note": "Contém TaskbarAnimations=0; referência do efeito de desativação."
+        }
+      ],
+      "Benefit": "Interface",
+      "RecommendedDirection": "Off",
+      "MaxBuild": 19045
+    },
+    {
+      "Id": "drag-full-windows",
+      "Category": "Sistema",
+      "Title": "Conteúdo da janela durante o arraste",
+      "Description": "Ativar mostra o conteúdo da janela enquanto ela é arrastada. Desativar pode exibir apenas o contorno, conforme o aplicativo e o compositor do Windows.",
+      "Risk": "Baixo",
+      "RequiresRestart": true,
+      "MinBuild": 19041,
+      "SelectionPolicy": "Manual",
+      "OnTargets": [
+        {
+          "Path": "HKCU:\\Control Panel\\Desktop",
+          "Name": "DragFullWindows",
+          "Exists": true,
+          "KeyExisted": true,
+          "Value": "1",
+          "Type": "String"
+        }
+      ],
+      "OffTargets": [
+        {
+          "Path": "HKCU:\\Control Panel\\Desktop",
+          "Name": "DragFullWindows",
+          "Exists": true,
+          "KeyExisted": true,
+          "Value": "0",
+          "Type": "String"
+        }
+      ],
+      "OnLabel": "Ativar",
+      "OffLabel": "Desativar",
+      "Sources": [
+        {
+          "RepositoryId": "winutil",
+          "ItemId": "file:config/tweaks.json",
+          "Url": "https://github.com/ChrisTitusTech/winutil/blob/2f0bdc8fca52e1ebe31a8d98216428061d3f8956/config/tweaks.json",
+          "Note": "WPFTweaksDisplay usa DragFullWindows='0' e OriginalValue='1'."
+        }
+      ],
+      "Benefit": "Interface"
+    },
+    {
+      "Id": "selection-transparency",
+      "Category": "Sistema",
+      "Title": "Retângulo de seleção translúcido",
+      "Description": "Controla a seleção translúcida em áreas compatíveis do Explorer/Área de Trabalho. É uma preferência de interface, sem alteração de GPU ou agendador.",
+      "Risk": "Baixo",
+      "RequiresRestart": true,
+      "MinBuild": 19041,
+      "SelectionPolicy": "Manual",
+      "OnTargets": [
+        {
+          "Path": "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced",
+          "Name": "ListviewAlphaSelect",
+          "Exists": true,
+          "KeyExisted": true,
+          "Value": 1,
+          "Type": "DWord"
+        }
+      ],
+      "OffTargets": [
+        {
+          "Path": "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced",
+          "Name": "ListviewAlphaSelect",
+          "Exists": true,
+          "KeyExisted": true,
+          "Value": 0,
+          "Type": "DWord"
+        }
+      ],
+      "OnLabel": "Ativar",
+      "OffLabel": "Desativar",
+      "Sources": [
+        {
+          "RepositoryId": "winutil",
+          "ItemId": "file:config/tweaks.json",
+          "Url": "https://github.com/ChrisTitusTech/winutil/blob/2f0bdc8fca52e1ebe31a8d98216428061d3f8956/config/tweaks.json",
+          "Note": "WPFTweaksDisplay usa ListviewAlphaSelect=0 e OriginalValue=1."
+        }
+      ],
+      "Benefit": "Interface"
+    },
+    {
+      "Id": "desktop-label-shadows",
+      "Category": "Sistema",
+      "Title": "Sombras nos nomes dos ícones",
+      "Description": "Controla sombras nos rótulos dos ícones da Área de Trabalho. A aparência também depende do tema e das opções de acessibilidade.",
+      "Risk": "Baixo",
+      "RequiresRestart": true,
+      "MinBuild": 19041,
+      "SelectionPolicy": "Manual",
+      "OnTargets": [
+        {
+          "Path": "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced",
+          "Name": "ListviewShadow",
+          "Exists": true,
+          "KeyExisted": true,
+          "Value": 1,
+          "Type": "DWord"
+        }
+      ],
+      "OffTargets": [
+        {
+          "Path": "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced",
+          "Name": "ListviewShadow",
+          "Exists": true,
+          "KeyExisted": true,
+          "Value": 0,
+          "Type": "DWord"
+        }
+      ],
+      "OnLabel": "Ativar",
+      "OffLabel": "Desativar",
+      "Sources": [
+        {
+          "RepositoryId": "winutil",
+          "ItemId": "file:config/tweaks.json",
+          "Url": "https://github.com/ChrisTitusTech/winutil/blob/2f0bdc8fca52e1ebe31a8d98216428061d3f8956/config/tweaks.json",
+          "Note": "WPFTweaksDisplay usa ListviewShadow=0 e OriginalValue=1."
+        }
+      ],
+      "Benefit": "Interface"
+    },
+    {
+      "Id": "menu-response",
+      "Category": "Sistema",
+      "Title": "Abertura mais rápida dos menus",
+      "Description": "Define a espera de menus clássicos em 200 ms; desativar usa 400 ms conforme o par revisado. Não altera frequência do mouse, processamento do jogo ou input lag medido.",
+      "Risk": "Baixo",
+      "RequiresRestart": true,
+      "MinBuild": 19041,
+      "SelectionPolicy": "Manual",
+      "OnTargets": [
+        {
+          "Path": "HKCU:\\Control Panel\\Desktop",
+          "Name": "MenuShowDelay",
+          "Exists": true,
+          "KeyExisted": true,
+          "Value": "200",
+          "Type": "String"
+        }
+      ],
+      "OffTargets": [
+        {
+          "Path": "HKCU:\\Control Panel\\Desktop",
+          "Name": "MenuShowDelay",
+          "Exists": true,
+          "KeyExisted": true,
+          "Value": "400",
+          "Type": "String"
+        }
+      ],
+      "OnLabel": "Aplicar",
+      "OffLabel": "Desativar",
+      "Sources": [
+        {
+          "RepositoryId": "winutil",
+          "ItemId": "file:config/tweaks.json",
+          "Url": "https://github.com/ChrisTitusTech/winutil/blob/2f0bdc8fca52e1ebe31a8d98216428061d3f8956/config/tweaks.json",
+          "Note": "WPFTweaksDisplay usa MenuShowDelay='200' e OriginalValue='400'."
+        }
+      ],
+      "Benefit": "Interface"
+    },
+    {
+      "Id": "keyboard-repeat-delay",
+      "Category": "Sistema",
+      "Title": "Menor espera para repetição do teclado",
+      "Description": "Escolhe a menor espera do Windows antes de repetir uma tecla mantida pressionada. Não acelera o primeiro pressionamento nem garante efeito em jogos que usam entrada própria.",
+      "Risk": "Baixo",
+      "RequiresRestart": true,
+      "MinBuild": 19041,
+      "SelectionPolicy": "Manual",
+      "OnTargets": [
+        {
+          "Path": "HKCU:\\Control Panel\\Keyboard",
+          "Name": "KeyboardDelay",
+          "Exists": true,
+          "KeyExisted": true,
+          "Value": "0",
+          "Type": "String"
+        }
+      ],
+      "OffTargets": [
+        {
+          "Path": "HKCU:\\Control Panel\\Keyboard",
+          "Name": "KeyboardDelay",
+          "Exists": true,
+          "KeyExisted": true,
+          "Value": "1",
+          "Type": "String"
+        }
+      ],
+      "OnLabel": "Aplicar",
+      "OffLabel": "Desativar",
+      "Sources": [
+        {
+          "RepositoryId": "winutil",
+          "ItemId": "file:config/tweaks.json",
+          "Url": "https://github.com/ChrisTitusTech/winutil/blob/2f0bdc8fca52e1ebe31a8d98216428061d3f8956/config/tweaks.json",
+          "Note": "WPFTweaksDisplay usa KeyboardDelay='0' e OriginalValue='1'."
+        }
+      ],
+      "Benefit": "Entrada"
+    },
+    {
+      "Id": "desktop-peek",
+      "Category": "Sistema",
+      "Title": "Prévia da Área de Trabalho (Peek)",
+      "Description": "Controla a preferência de prévia Peek no Windows 10. Não é aplicada a Windows 11, cuja experiência de barra de tarefas é diferente.",
+      "Risk": "Baixo",
+      "RequiresRestart": true,
+      "MinBuild": 19041,
+      "SelectionPolicy": "Manual",
+      "OnTargets": [
+        {
+          "Path": "HKCU:\\Software\\Microsoft\\Windows\\DWM",
+          "Name": "EnableAeroPeek",
+          "Exists": true,
+          "KeyExisted": true,
+          "Value": 1,
+          "Type": "DWord"
+        }
+      ],
+      "OffTargets": [
+        {
+          "Path": "HKCU:\\Software\\Microsoft\\Windows\\DWM",
+          "Name": "EnableAeroPeek",
+          "Exists": true,
+          "KeyExisted": true,
+          "Value": 0,
+          "Type": "DWord"
+        }
+      ],
+      "OnLabel": "Ativar",
+      "OffLabel": "Desativar",
+      "Sources": [
+        {
+          "RepositoryId": "winutil",
+          "ItemId": "file:config/tweaks.json",
+          "Url": "https://github.com/ChrisTitusTech/winutil/blob/2f0bdc8fca52e1ebe31a8d98216428061d3f8956/config/tweaks.json",
+          "Note": "WPFTweaksDisplay usa EnableAeroPeek=0 e OriginalValue=1."
+        }
+      ],
+      "Benefit": "Interface",
+      "MaxBuild": 19045
+    },
+    {
+      "Id": "taskbar-centered",
+      "Category": "Sistema",
+      "Title": "Ícones da barra de tarefas centralizados",
+      "Description": "Centraliza ícones no Windows 11; desativar alinha à esquerda. Não altera aplicativos fixados ou desempenho de jogos.",
+      "Risk": "Baixo",
+      "RequiresRestart": true,
+      "MinBuild": 22000,
+      "SelectionPolicy": "Manual",
+      "OnTargets": [
+        {
+          "Path": "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced",
+          "Name": "TaskbarAl",
+          "Exists": true,
+          "KeyExisted": true,
+          "Value": 1,
+          "Type": "DWord"
+        }
+      ],
+      "OffTargets": [
+        {
+          "Path": "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced",
+          "Name": "TaskbarAl",
+          "Exists": true,
+          "KeyExisted": true,
+          "Value": 0,
+          "Type": "DWord"
+        }
+      ],
+      "OnLabel": "Ativar",
+      "OffLabel": "Desativar",
+      "Sources": [
+        {
+          "RepositoryId": "rytunex",
+          "ItemId": "file:Helpers/OptimizeSystemHelper.cs",
+          "Url": "https://github.com/rayenghanmi/RyTuneX/blob/957885f53beaacfa7322581cafdb9eba5df5726a/Helpers/OptimizeSystemHelper.cs",
+          "Note": "Métodos de alinhamento escrevem TaskbarAl=0/1."
+        },
+        {
+          "RepositoryId": "winutil",
+          "ItemId": "file:config/tweaks.json",
+          "Url": "https://github.com/ChrisTitusTech/winutil/blob/2f0bdc8fca52e1ebe31a8d98216428061d3f8956/config/tweaks.json",
+          "Note": "WPFToggleTaskbarAlignment contém os dois valores de TaskbarAl."
+        }
+      ],
+      "Benefit": "Interface"
+    },
+    {
+      "Id": "snap-layout-flyout",
+      "Category": "Sistema",
+      "Title": "Sugestões de encaixe ao maximizar",
+      "Description": "Mostra o painel de layouts ao passar sobre o botão maximizar no Windows 11. Alguns aplicativos não usam a barra de título padrão.",
+      "Risk": "Baixo",
+      "RequiresRestart": true,
+      "MinBuild": 22000,
+      "SelectionPolicy": "Manual",
+      "OnTargets": [
+        {
+          "Path": "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced",
+          "Name": "EnableSnapAssistFlyout",
+          "Exists": true,
+          "KeyExisted": true,
+          "Value": 1,
+          "Type": "DWord"
+        }
+      ],
+      "OffTargets": [
+        {
+          "Path": "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced",
+          "Name": "EnableSnapAssistFlyout",
+          "Exists": true,
+          "KeyExisted": true,
+          "Value": 0,
+          "Type": "DWord"
+        }
+      ],
+      "OnLabel": "Ativar",
+      "OffLabel": "Desativar",
+      "Sources": [
+        {
+          "RepositoryId": "rytunex",
+          "ItemId": "file:Helpers/OptimizeSystemHelper.cs",
+          "Url": "https://github.com/rayenghanmi/RyTuneX/blob/957885f53beaacfa7322581cafdb9eba5df5726a/Helpers/OptimizeSystemHelper.cs",
+          "Note": "Métodos correspondentes escrevem EnableSnapAssistFlyout=0/1."
+        }
+      ],
+      "Benefit": "Interface"
+    },
+    {
+      "Id": "taskbar-end-task",
+      "Category": "Sistema",
+      "Title": "Comando Encerrar tarefa na barra",
+      "Description": "Exibe a opção Encerrar tarefa no menu da barra do Windows 11 23H2 ou superior. Usar esse comando pode descartar trabalho não salvo; habilitar a opção não encerra processos.",
+      "Risk": "Moderado",
+      "RequiresRestart": true,
+      "MinBuild": 22631,
+      "SelectionPolicy": "Manual",
+      "OnTargets": [
+        {
+          "Path": "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\\TaskbarDeveloperSettings",
+          "Name": "TaskbarEndTask",
+          "Exists": true,
+          "KeyExisted": true,
+          "Value": 1,
+          "Type": "DWord"
+        }
+      ],
+      "OffTargets": [
+        {
+          "Path": "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\\TaskbarDeveloperSettings",
+          "Name": "TaskbarEndTask",
+          "Exists": true,
+          "KeyExisted": true,
+          "Value": 0,
+          "Type": "DWord"
+        }
+      ],
+      "OnLabel": "Ativar",
+      "OffLabel": "Desativar",
+      "Sources": [
+        {
+          "RepositoryId": "rytunex",
+          "ItemId": "file:Helpers/OptimizeSystemHelper.cs",
+          "Url": "https://github.com/rayenghanmi/RyTuneX/blob/957885f53beaacfa7322581cafdb9eba5df5726a/Helpers/OptimizeSystemHelper.cs",
+          "Note": "Métodos correspondentes usam TaskbarEndTask=1/0."
+        },
+        {
+          "RepositoryId": "winutil",
+          "ItemId": "file:config/tweaks.json",
+          "Url": "https://github.com/ChrisTitusTech/winutil/blob/2f0bdc8fca52e1ebe31a8d98216428061d3f8956/config/tweaks.json",
+          "Note": "A configuração de End Task usa TaskbarEndTask."
+        }
+      ],
+      "Benefit": "Interface"
+    },
+    {
+      "Id": "advertising-id",
+      "Category": "Sistema",
+      "Title": "Identificador de publicidade do usuário",
+      "Description": "Permite a preferência de identificador publicitário do Windows para apps compatíveis. Desativar restringe esse identificador, sem eliminar anúncios nem toda coleta de dados. A política corporativa pode prevalecer.",
+      "Risk": "Baixo",
+      "RequiresRestart": true,
+      "MinBuild": 19041,
+      "SelectionPolicy": "Manual",
+      "OnTargets": [
+        {
+          "Path": "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\AdvertisingInfo",
+          "Name": "Enabled",
+          "Exists": true,
+          "KeyExisted": true,
+          "Value": 1,
+          "Type": "DWord"
+        }
+      ],
+      "OffTargets": [
+        {
+          "Path": "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\AdvertisingInfo",
+          "Name": "Enabled",
+          "Exists": true,
+          "KeyExisted": true,
+          "Value": 0,
+          "Type": "DWord"
+        }
+      ],
+      "OnLabel": "Ativar",
+      "OffLabel": "Desativar",
+      "Sources": [
+        {
+          "RepositoryId": "rytunex",
+          "ItemId": "file:Helpers/OptimizeSystemHelper.cs",
+          "Url": "https://github.com/rayenghanmi/RyTuneX/blob/957885f53beaacfa7322581cafdb9eba5df5726a/Helpers/OptimizeSystemHelper.cs",
+          "Note": "DisableAdvertisingID/EnableAdvertisingID usam AdvertisingInfo Enabled=0/1; o GOAT altera somente a preferência HKCU."
+        },
+        {
+          "RepositoryId": "winutil",
+          "ItemId": "file:config/tweaks.json",
+          "Url": "https://github.com/ChrisTitusTech/winutil/blob/2f0bdc8fca52e1ebe31a8d98216428061d3f8956/config/tweaks.json",
+          "Note": "O ajuste de telemetria contém AdvertisingInfo Enabled=0; não importamos o restante do bloco."
+        }
+      ],
+      "Benefit": "Privacidade"
+    },
+    {
+      "Id": "tailored-experiences",
+      "Category": "Sistema",
+      "Title": "Experiências personalizadas com dados de diagnóstico",
+      "Description": "Permite sugestões personalizadas com base em dados de diagnóstico, conforme a configuração do Windows. Desativar essa preferência não desliga diagnósticos necessários ou serviços de segurança.",
+      "Risk": "Baixo",
+      "RequiresRestart": true,
+      "MinBuild": 19041,
+      "SelectionPolicy": "Manual",
+      "OnTargets": [
+        {
+          "Path": "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Privacy",
+          "Name": "TailoredExperiencesWithDiagnosticDataEnabled",
+          "Exists": true,
+          "KeyExisted": true,
+          "Value": 1,
+          "Type": "DWord"
+        }
+      ],
+      "OffTargets": [
+        {
+          "Path": "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Privacy",
+          "Name": "TailoredExperiencesWithDiagnosticDataEnabled",
+          "Exists": true,
+          "KeyExisted": true,
+          "Value": 0,
+          "Type": "DWord"
+        }
+      ],
+      "OnLabel": "Ativar",
+      "OffLabel": "Desativar",
+      "Sources": [
+        {
+          "RepositoryId": "rytunex",
+          "ItemId": "file:Helpers/OptimizeSystemHelper.cs",
+          "Url": "https://github.com/rayenghanmi/RyTuneX/blob/957885f53beaacfa7322581cafdb9eba5df5726a/Helpers/OptimizeSystemHelper.cs",
+          "Note": "O par DisableTailoredExperiences/EnableTailoredExperiences usa o valor HKCU 0/1; não copiamos alterações em HKEY_USERS .DEFAULT."
+        },
+        {
+          "RepositoryId": "winutil",
+          "ItemId": "file:config/tweaks.json",
+          "Url": "https://github.com/ChrisTitusTech/winutil/blob/2f0bdc8fca52e1ebe31a8d98216428061d3f8956/config/tweaks.json",
+          "Note": "O bloco de telemetria contém essa preferência; aqui ela é isolada das outras alterações."
+        }
+      ],
+      "Benefit": "Privacidade"
+    },
+    {
+      "Id": "app-launch-tracking",
+      "Category": "Sistema",
+      "Title": "Histórico de inicialização de aplicativos",
+      "Description": "Permite rastrear inicializações para personalizar listas do Windows. Desativar muda essa preferência do usuário; não bloqueia apps, não remove o histórico de todos os programas e não garante menor uso de CPU.",
+      "Risk": "Baixo",
+      "RequiresRestart": true,
+      "MinBuild": 19041,
+      "SelectionPolicy": "Manual",
+      "OnTargets": [
+        {
+          "Path": "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced",
+          "Name": "Start_TrackProgs",
+          "Exists": true,
+          "KeyExisted": true,
+          "Value": 1,
+          "Type": "DWord"
+        }
+      ],
+      "OffTargets": [
+        {
+          "Path": "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced",
+          "Name": "Start_TrackProgs",
+          "Exists": true,
+          "KeyExisted": true,
+          "Value": 0,
+          "Type": "DWord"
+        }
+      ],
+      "OnLabel": "Ativar",
+      "OffLabel": "Desativar",
+      "Sources": [
+        {
+          "RepositoryId": "rytunex",
+          "ItemId": "file:Helpers/OptimizeSystemHelper.cs",
+          "Url": "https://github.com/rayenghanmi/RyTuneX/blob/957885f53beaacfa7322581cafdb9eba5df5726a/Helpers/OptimizeSystemHelper.cs",
+          "Note": "O par correspondente escreve Start_TrackProgs=0/1."
+        },
+        {
+          "RepositoryId": "winutil",
+          "ItemId": "file:config/tweaks.json",
+          "Url": "https://github.com/ChrisTitusTech/winutil/blob/2f0bdc8fca52e1ebe31a8d98216428061d3f8956/config/tweaks.json",
+          "Note": "O bloco de telemetria contém Start_TrackProgs=0."
+        }
+      ],
+      "Benefit": "Privacidade"
+    },
+    {
+      "Id": "online-speech",
+      "Category": "Sistema",
+      "Title": "Reconhecimento de fala online",
+      "Description": "Altera a preferência do usuário para recursos de fala online. Ativar pode permitir envio de voz para processamento quando o recurso for usado; desativar pode limitar ditado e recursos dependentes.",
+      "Risk": "Moderado",
+      "RequiresRestart": true,
+      "MinBuild": 19041,
+      "SelectionPolicy": "Manual",
+      "OnTargets": [
+        {
+          "Path": "HKCU:\\Software\\Microsoft\\Speech_OneCore\\Settings\\OnlineSpeechPrivacy",
+          "Name": "HasAccepted",
+          "Exists": true,
+          "KeyExisted": true,
+          "Value": 1,
+          "Type": "DWord"
+        }
+      ],
+      "OffTargets": [
+        {
+          "Path": "HKCU:\\Software\\Microsoft\\Speech_OneCore\\Settings\\OnlineSpeechPrivacy",
+          "Name": "HasAccepted",
+          "Exists": true,
+          "KeyExisted": true,
+          "Value": 0,
+          "Type": "DWord"
+        }
+      ],
+      "OnLabel": "Ativar",
+      "OffLabel": "Desativar",
+      "Sources": [
+        {
+          "RepositoryId": "rytunex",
+          "ItemId": "file:Helpers/OptimizeSystemHelper.cs",
+          "Url": "https://github.com/rayenghanmi/RyTuneX/blob/957885f53beaacfa7322581cafdb9eba5df5726a/Helpers/OptimizeSystemHelper.cs",
+          "Note": "DisableOnlineSpeechPrivacy/EnableOnlineSpeechPrivacy usam HasAccepted=0/1."
+        },
+        {
+          "RepositoryId": "winutil",
+          "ItemId": "file:config/tweaks.json",
+          "Url": "https://github.com/ChrisTitusTech/winutil/blob/2f0bdc8fca52e1ebe31a8d98216428061d3f8956/config/tweaks.json",
+          "Note": "O bloco de telemetria contém HasAccepted=0."
+        }
+      ],
+      "Benefit": "Privacidade"
+    },
+    {
+      "Id": "typing-personalization",
+      "Category": "Sistema",
+      "Title": "Personalização de escrita e digitação",
+      "Description": "Permite a preferência de coleta implícita de escrita e texto para personalização. Desativar pode limitar aprendizado de palavras e sugestões. Não altera o funcionamento básico do teclado.",
+      "Risk": "Moderado",
+      "RequiresRestart": true,
+      "MinBuild": 19041,
+      "SelectionPolicy": "Manual",
+      "OnTargets": [
+        {
+          "Path": "HKCU:\\Software\\Microsoft\\InputPersonalization",
+          "Name": "RestrictImplicitInkCollection",
+          "Exists": true,
+          "KeyExisted": true,
+          "Value": 0,
+          "Type": "DWord"
+        },
+        {
+          "Path": "HKCU:\\Software\\Microsoft\\InputPersonalization",
+          "Name": "RestrictImplicitTextCollection",
+          "Exists": true,
+          "KeyExisted": true,
+          "Value": 0,
+          "Type": "DWord"
+        }
+      ],
+      "OffTargets": [
+        {
+          "Path": "HKCU:\\Software\\Microsoft\\InputPersonalization",
+          "Name": "RestrictImplicitInkCollection",
+          "Exists": true,
+          "KeyExisted": true,
+          "Value": 1,
+          "Type": "DWord"
+        },
+        {
+          "Path": "HKCU:\\Software\\Microsoft\\InputPersonalization",
+          "Name": "RestrictImplicitTextCollection",
+          "Exists": true,
+          "KeyExisted": true,
+          "Value": 1,
+          "Type": "DWord"
+        }
+      ],
+      "OnLabel": "Ativar",
+      "OffLabel": "Desativar",
+      "Sources": [
+        {
+          "RepositoryId": "ultimate",
+          "ItemId": "file:6 Windows/22 Control Panel Settings.ps1",
+          "Url": "https://github.com/FR33THYFR33THY/Ultimate/blob/a0a33a57078434201f582b0db5107dcbb502292a/6%20Windows/22%20Control%20Panel%20Settings.ps1",
+          "Note": "Blocos revisados contêm RestrictImplicitInkCollection/TextCollection=1 e reversão=0."
+        },
+        {
+          "RepositoryId": "winutil",
+          "ItemId": "file:config/tweaks.json",
+          "Url": "https://github.com/ChrisTitusTech/winutil/blob/2f0bdc8fca52e1ebe31a8d98216428061d3f8956/config/tweaks.json",
+          "Note": "O ajuste de telemetria contém ambos os valores de restrição=1; o GOAT não aplica o restante desse ajuste."
+        }
+      ],
+      "Benefit": "Privacidade"
+    },
+    {
+      "Id": "delivery-p2p",
+      "Category": "Rede",
+      "Title": "Compartilhamento local de atualizações (P2P)",
+      "Description": "Ativar define modo 1 (pares da rede local); desativar define modo 0 (HTTP sem P2P). A preferência local não bloqueia Windows Update. Políticas de organização podem prevalecer; não há promessa de menor ping.",
+      "Risk": "Moderado",
+      "RequiresRestart": true,
+      "MinBuild": 19041,
+      "SelectionPolicy": "Manual",
+      "OnTargets": [
+        {
+          "Path": "HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\DeliveryOptimization\\Config",
+          "Name": "DODownloadMode",
+          "Exists": true,
+          "KeyExisted": true,
+          "Value": 1,
+          "Type": "DWord"
+        }
+      ],
+      "OffTargets": [
+        {
+          "Path": "HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\DeliveryOptimization\\Config",
+          "Name": "DODownloadMode",
+          "Exists": true,
+          "KeyExisted": true,
+          "Value": 0,
+          "Type": "DWord"
+        }
+      ],
+      "OnLabel": "Ativar",
+      "OffLabel": "Desativar",
+      "Sources": [
+        {
+          "RepositoryId": "rytunex",
+          "ItemId": "file:Helpers/OptimizeSystemHelper.cs",
+          "Url": "https://github.com/rayenghanmi/RyTuneX/blob/957885f53beaacfa7322581cafdb9eba5df5726a/Helpers/OptimizeSystemHelper.cs",
+          "Note": "O helper usa DODownloadMode=0 no caminho local e remove-o no retorno ao padrão. Os modos 0/1 são documentados pela Microsoft; esta opção não executa o perfil de bloqueio de updates."
+        }
+      ],
+      "Benefit": "Rede"
+    },
+    {
+      "Id": "device-setup-suggestions",
+      "Category": "Sistema",
+      "Title": "Redução de sugestões de configuração",
+      "Description": "Suprime a preferência de convites para concluir a configuração do dispositivo. Usar padrão remove somente ScoobeSystemSettingEnabled e devolve a decisão ao Windows. Não altera conta, logon ou segurança.",
+      "Risk": "Baixo",
+      "RequiresRestart": true,
+      "MinBuild": 19041,
+      "SelectionPolicy": "Manual",
+      "OnTargets": [
+        {
+          "Path": "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\UserProfileEngagement",
+          "Name": "ScoobeSystemSettingEnabled",
+          "Exists": true,
+          "KeyExisted": true,
+          "Value": 0,
+          "Type": "DWord"
+        }
+      ],
+      "OffTargets": [
+        {
+          "Path": "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\UserProfileEngagement",
+          "Name": "ScoobeSystemSettingEnabled",
+          "Exists": false,
+          "KeyExisted": true,
+          "Value": null,
+          "Type": "DWord"
+        }
+      ],
+      "OnLabel": "Aplicar",
+      "OffLabel": "Usar padrão",
+      "Sources": [
+        {
+          "RepositoryId": "rytunex",
+          "ItemId": "file:Helpers/OptimizeSystemHelper.cs",
+          "Url": "https://github.com/rayenghanmi/RyTuneX/blob/957885f53beaacfa7322581cafdb9eba5df5726a/Helpers/OptimizeSystemHelper.cs",
+          "Note": "O par correspondente define ScoobeSystemSettingEnabled=0 e remove a preferência na reversão."
+        }
+      ],
+      "Benefit": "Privacidade"
+    }
+  ]
+}

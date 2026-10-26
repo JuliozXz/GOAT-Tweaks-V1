@@ -1,4 +1,4 @@
-﻿# GOAT Tweaks v2.2 - mutation engine. Windows PowerShell 5.1 / x64.
+﻿# GOAT Tweaks v2.4 - mutation engine. Windows PowerShell 5.1 / x64.
 # UI and scanner never call a mutation unless the technician requests it.
 
 function Test-GoatAdministrator {
@@ -107,6 +107,36 @@ function Get-GoatMemoryCompression {
     return [bool]$agent.MemoryCompression
 }
 
+function Get-GoatNativeOptionDefinitions {
+    if (-not $script:GoatNativeOptionsJson) { return @() }
+    $catalog=$script:GoatNativeOptionsJson | ConvertFrom-Json -ErrorAction Stop
+    if ($catalog.SchemaVersion -ne 1) { throw 'Catálogo nativo incompatível.' }
+    $ids=@{}
+    foreach ($option in @($catalog.Options)) {
+        if ($option.Id -notmatch '^[a-z0-9-]+$' -or $ids.ContainsKey([string]$option.Id)) { throw 'ID nativo inválido ou duplicado.' }
+        $ids[[string]$option.Id]=$true
+        if (@($option.OnTargets).Count -eq 0 -or @($option.OffTargets).Count -eq 0) { throw 'Opção nativa sem os dois estados revisados.' }
+        $onKeys=@{}
+        foreach ($target in @($option.OnTargets)+@($option.OffTargets)) {
+            if ($target.Path -notmatch '^HK(CU|LM):\\' -or [string]::IsNullOrWhiteSpace($target.Name) -or $target.Type -notin @('DWord','String') -or $target.Exists -isnot [bool]) { throw 'Alvo de Registro nativo inválido.' }
+        }
+        foreach ($target in $option.OnTargets) { $onKeys[$target.Path+'|'+$target.Name]=$true }
+        foreach ($target in $option.OffTargets) { if (-not $onKeys.ContainsKey($target.Path+'|'+$target.Name)) { throw 'Estado alternativo fora dos alvos revisados.' } }
+    }
+    return @($catalog.Options)
+}
+
+function Test-GoatRegistryTargetsMatch {
+    param([object[]]$Targets)
+    if ($Targets.Count -eq 0) { return $false }
+    foreach ($target in $Targets) {
+        $actual=Get-GoatRegistryState $target.Path $target.Name
+        if ([bool]$actual.Exists -ne [bool]$target.Exists) { return $false }
+        if ($target.Exists -and ($actual.Type -ne $target.Type -or (ConvertTo-Json -InputObject $actual.Value -Compress) -ne (ConvertTo-Json -InputObject $target.Value -Compress))) { return $false }
+    }
+    return $true
+}
+
 function Get-GoatTweaks {
     param([Parameter(Mandatory=$true)]$Scan)
     $list = New-Object System.Collections.Generic.List[object]
@@ -128,9 +158,16 @@ function Get-GoatTweaks {
         @{ Id='background-apps'; Category='Sistema'; Title='Restringir apps UWP em segundo plano'; Description='Define preferência global de atividade em segundo plano para apps compatíveis. Pode afetar notificações. Não desinstala aplicativos.'; Risk='Moderado'; Recommended=$false; Restart=$true; Targets=@(
             (New-GoatRegistryTarget 'HKCU:\Software\Microsoft\Windows\CurrentVersion\BackgroundAccessApplications' 'GlobalUserDisabled' 1)) }
     )
+    $nativeOptions=@(Get-GoatNativeOptionDefinitions)
+    foreach ($option in $nativeOptions) {
+        if (@($definitions | Where-Object Id -eq $option.Id).Count -gt 0 -or $option.Id -in @('memory-compression','power-high','tcp-normal','rss-on')) { throw 'ID duplicado com o catálogo original.' }
+        $definitions+=@{Id=$option.Id;Category=$option.Category;Title=$option.Title;Description=$option.Description;Risk=$option.Risk;Restart=$option.RequiresRestart;Recommended=$false;Targets=@($option.OnTargets);MinBuild=$option.MinBuild;MaxBuild=$option.MaxBuild}
+    }
     foreach ($definition in $definitions) {
         $available = [bool]$Scan.OS.Supported; $reason = ''; $applied = $true
         if (-not $available) { $reason = 'Edição/build do Windows fora da faixa validada (Windows 10/11, build 19041+).' }
+        if ($definition.MinBuild -and (-not $Scan.OS.Build -or $Scan.OS.Build -lt $definition.MinBuild)) { $available=$false; $reason='Opção exige Windows build '+$definition.MinBuild+' ou superior.' }
+        if ($definition.MaxBuild -and $Scan.OS.Build -gt $definition.MaxBuild) { $available=$false; $reason='Opção não revisada nesta build do Windows.' }
         foreach ($target in $definition.Targets) {
             if ($Scan.IsDemo) { $applied = $false; continue }
             try {
@@ -175,6 +212,37 @@ function Get-GoatTweaks {
         }
         $status='Disponível'; if ($applied) {$status='Aplicado'}; if (-not $available) {$status='Indisponível'}
         $list.Add([pscustomobject]@{Id=$definition.Id;Category=$definition.Category;Title=$definition.Title;Description=$definition.Description;Risk=$definition.Risk;Recommended=($definition.Kind -eq 'MemoryCompression' -and $available -and -not $applied);Available=$available;UnavailableReason=$reason;RequiresRestart=$definition.Restart;State=$status;Kind=$definition.Kind;Target=$definition.Target;Targets=@()})
+    }
+    foreach ($item in $list) {
+        $native=@($nativeOptions | Where-Object Id -eq $item.Id)
+        $offTargets=@(); $offTarget=$null; $canDisable=$false; $offState=$false
+        $onLabel='Aplicar'; $offLabel='Usar padrão'; $policy='Manual'; $desired='On'; $sources=@(); $benefit='Preferência'; $conflictGroup=''
+        if ($native.Count -eq 1) {
+            $definition=$native[0]; $offTargets=@($definition.OffTargets);$canDisable=$true
+            $onLabel=$definition.OnLabel;$offLabel=$definition.OffLabel;$policy=$definition.SelectionPolicy;$sources=@($definition.Sources);$benefit=$definition.Benefit;$conflictGroup=$definition.ConflictGroup
+            if ($definition.RecommendedDirection) {$desired=$definition.RecommendedDirection}
+        } else {
+            switch ($item.Id) {
+                'game-mode' { $policy='Gaming';$onLabel='Ativar';$offLabel='Desativar';$benefit='Jogos';$offTargets=@($item.Targets|ForEach-Object {New-GoatRegistryTarget $_.Path $_.Name 0}) }
+                'capture-off' { $policy='Gaming';$onLabel='Desligar captura';$offLabel='Permitir captura';$benefit='Gravação';$offTargets=@($item.Targets|ForEach-Object {New-GoatRegistryTarget $_.Path $_.Name 1}) }
+                'visual-effects' { $policy='LowMemory';$onLabel='Reduzir efeitos';$offLabel='Usar padrão';$benefit='Interface';$offTargets=@($item.Targets|ForEach-Object {[pscustomobject]@{Path=$_.Path;Name=$_.Name;Exists=$false;KeyExisted=$true;Value=$null;Type=$_.Type}}) }
+                'background-apps' { $onLabel='Restringir';$offLabel='Permitir';$benefit='Segundo plano';$offTargets=@($item.Targets|ForEach-Object {New-GoatRegistryTarget $_.Path $_.Name 0}) }
+                'memory-compression' { $policy='MemoryPressure';$onLabel='Ativar';$offLabel='Desativar';$benefit='Memória';$canDisable=$true;$offTarget=$false }
+                'rss-on' { $policy='NetworkRepair';$onLabel='Ativar RSS';$offLabel='Desativar RSS';$benefit='Rede';$canDisable=$true;$offTarget='Disabled' }
+                'tcp-normal' { $policy='NetworkRepair';$benefit='Rede' }
+                'power-high' { $benefit='Energia' }
+            }
+            if ($offTargets.Count -gt 0) { $canDisable=$true }
+        }
+        if ($canDisable -and $item.Available -and -not $Scan.IsDemo) {
+            try {
+                if ($item.Kind -eq 'Registry') {$offState=Test-GoatRegistryTargetsMatch $offTargets}
+                elseif ($item.Kind -eq 'MemoryCompression') {$offState=-not (Get-GoatMemoryCompression)}
+                elseif ($item.Kind -eq 'Rss') {$offState=([string](Get-NetOffloadGlobalSetting -ErrorAction Stop).ReceiveSideScaling) -eq 'Disabled'}
+            } catch { $item.Available=$false;$item.State='Indisponível';$item.UnavailableReason=$_.Exception.Message }
+        } elseif ($Scan.IsDemo -and $item.Kind -in @('MemoryCompression','Rss')) { $offState=$item.State -ne 'Aplicado' }
+        $properties=@{CanDisable=$canDisable;OnState=($item.State -eq 'Aplicado');OffState=$offState;OffTargets=$offTargets;OffTarget=$offTarget;OnLabel=$onLabel;OffLabel=$offLabel;SelectionPolicy=$policy;DesiredState=$desired;RecommendedDirection=$desired;Sources=$sources;SourceLinks=$sources;Benefit=$benefit;ConflictGroup=$conflictGroup;RecommendationReason='Aguardando comparação com o perfil desta máquina.'}
+        foreach ($name in $properties.Keys) {$item|Add-Member -NotePropertyName $name -NotePropertyValue $properties[$name] -Force}
     }
     return $list.ToArray()
 }
@@ -295,7 +363,7 @@ function New-GoatResult {
 
 function Invoke-GoatApply {
     [CmdletBinding()]
-    param([Parameter(Mandatory=$true)][string[]]$Ids, [Parameter(Mandatory=$true)]$Scan, [switch]$Demo, [scriptblock]$ProgressCallback)
+    param([Parameter(Mandatory=$true)][string[]]$Ids, [Parameter(Mandatory=$true)]$Scan, [switch]$Demo, [scriptblock]$ProgressCallback,[hashtable]$Directions=@{})
     if ($Demo -or $Scan.IsDemo) { return New-GoatResult $true "DEMONSTRAÇÃO: $($Ids.Count) opções simuladas. Nenhuma configuração foi alterada." }
     $mutex=$null; $locked=$false; $journal=$null; $journalPath=''; $logPath=''; $transactionId=''
     try {
@@ -311,7 +379,22 @@ function Invoke-GoatApply {
             $entry = @($catalog | Where-Object { $_.Id -eq $id })
             if ($entry.Count -ne 1) { throw "Opção desconhecida: $id" }
             if (-not $entry[0].Available) { throw "$($entry[0].Title): $($entry[0].UnavailableReason)" }
-            if ($entry[0].State -ne 'Aplicado') { $selected.Add($entry[0]) }
+            $direction='On';if ($Directions.ContainsKey($id)) {$direction=[string]$Directions[$id]}
+            if ($direction -notin @('On','Off')) {throw 'Direção de ajuste inválida.'}
+            if ($direction -eq 'Off' -and -not $entry[0].CanDisable) {throw 'Este ajuste não possui estado alternativo revisado. Use Restaurar para recuperar o original.'}
+            if ($direction -eq 'On' -and $entry[0].State -eq 'Aplicado') {continue}
+            if ($direction -eq 'Off' -and $entry[0].OffState) {continue}
+            $chosen=$entry[0].PSObject.Copy()
+            if ($direction -eq 'Off') {if ($chosen.Kind -eq 'Registry') {$chosen.Targets=@($chosen.OffTargets)} else {$chosen.Target=$chosen.OffTarget}}
+            $selected.Add($chosen)
+        }
+        $targetKeys=@{}
+        foreach ($choice in $selected) {
+            foreach ($target in @($choice.Targets)) {
+                $key=$target.Path+'|'+$target.Name
+                if ($targetKeys.ContainsKey($key)) {throw 'Há opções sobrepostas na seleção. Aplique uma opção por configuração.'}
+                $targetKeys[$key]=$true
+            }
         }
         if ($selected.Count -eq 0) { return New-GoatResult $true 'As opções selecionadas já estão aplicadas ou a seleção está vazia.' }
         $root = Get-GoatStorageRoot
@@ -404,10 +487,17 @@ function Restore-GoatLastTransaction {
         $backupRoot=Join-Path $root 'backups'
         if (-not (Test-Path -LiteralPath $backupRoot)) { throw 'Nenhum backup encontrado neste computador.' }
         $identity=Get-GoatMachineIdentity
-        foreach ($file in @(Get-ChildItem -LiteralPath $backupRoot -Filter '*.json' -File | Sort-Object Name -Descending)) {
+        $eligible=New-Object 'System.Collections.Generic.List[object]'
+        foreach ($file in @(Get-ChildItem -LiteralPath $backupRoot -Filter '*.json' -File)) {
             $candidate=Get-Content -LiteralPath $file.FullName -Raw -Encoding UTF8 -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
-            if ($candidate.MachineGuid -eq $identity.MachineGuid -and $candidate.UserSid -eq $identity.UserSid -and $candidate.Status -in @('Applied','Applying','Restoring','RollbackIncomplete')) { $journal=$candidate; $journalPath=$file.FullName; break }
+            if ($candidate.MachineGuid -eq $identity.MachineGuid -and $candidate.UserSid -eq $identity.UserSid -and $candidate.Status -in @('Applied','Applying','Restoring','RollbackIncomplete')) {
+                $created=[DateTimeOffset]::MinValue
+                if (-not [DateTimeOffset]::TryParse([string]$candidate.CreatedUtc,[Globalization.CultureInfo]::InvariantCulture,[Globalization.DateTimeStyles]::AssumeUniversal,[ref]$created)) {throw 'Data inválida no diário; preserve o backup para revisão.'}
+                $eligible.Add([pscustomobject]@{Journal=$candidate;Path=$file.FullName;CreatedTicks=$created.UtcTicks})
+            }
         }
+        $latest=@($eligible.ToArray()|Sort-Object CreatedTicks -Descending|Select-Object -First 1)
+        if ($latest.Count -eq 1) {$journal=$latest[0].Journal;$journalPath=$latest[0].Path}
         if (-not $journal) { throw 'Nenhuma transação aplicada ou interrompida para restaurar neste Windows/usuário.' }
         Assert-GoatJournal $journal
         $logPath=Join-Path $root "logs\$($journal.Id)-restore.log"

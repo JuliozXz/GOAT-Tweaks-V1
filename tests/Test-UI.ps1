@@ -9,6 +9,10 @@ $script:GoatCoreSource=Get-Content -LiteralPath (Join-Path $script:GoatRoot 'src
 $script:GoatAdvancedScannerSource=Get-Content -LiteralPath (Join-Path $script:GoatRoot 'src\AdvancedScanner.ps1') -Raw -Encoding UTF8
 $script:GoatRecommendationSource=Get-Content -LiteralPath (Join-Path $script:GoatRoot 'src\Recommendations.ps1') -Raw -Encoding UTF8
 $script:GoatRecommendationJson=Get-Content -LiteralPath (Join-Path $script:GoatRoot 'data\recommendations.json') -Raw -Encoding UTF8
+$script:GoatSelectionSource=Get-Content -LiteralPath (Join-Path $script:GoatRoot 'src\Selection.ps1') -Raw -Encoding UTF8
+$script:GoatNativeOptionsJson=Get-Content -LiteralPath (Join-Path $script:GoatRoot 'data\native-options.json') -Raw -Encoding UTF8
+$script:GoatToolAdvisorSource=Get-Content -LiteralPath (Join-Path $script:GoatRoot 'src\ToolAdvisor.ps1') -Raw -Encoding UTF8
+$script:GoatToolRulesJson=Get-Content -LiteralPath (Join-Path $script:GoatRoot 'data\tool-rules.json') -Raw -Encoding UTF8
 $script:GoatIntegrationSource=Get-Content -LiteralPath (Join-Path $script:GoatRoot 'src\Integrations.ps1') -Raw -Encoding UTF8
 $script:GoatCatalogJson=Get-Content -LiteralPath (Join-Path $script:GoatRoot 'data\repositories.json') -Raw -Encoding UTF8
 $script:GoatLogoBase64=[Convert]::ToBase64String([IO.File]::ReadAllBytes((Join-Path $script:GoatRoot 'assets\goat-logo.png')))
@@ -19,6 +23,8 @@ if ($Bundle) {
     . ([scriptblock]::Create($script:GoatIntegrationSource))
     . ([scriptblock]::Create($script:GoatAdvancedScannerSource))
     . ([scriptblock]::Create($script:GoatRecommendationSource))
+    . ([scriptblock]::Create($script:GoatSelectionSource))
+    . ([scriptblock]::Create($script:GoatToolAdvisorSource))
     . ([scriptblock]::Create($script:GoatUiSource))
     $script:GoatRoot=Split-Path $PSScriptRoot -Parent
 } else {
@@ -27,6 +33,8 @@ if ($Bundle) {
     . (Join-Path $script:GoatRoot 'src\Integrations.ps1')
     . (Join-Path $script:GoatRoot 'src\AdvancedScanner.ps1')
     . (Join-Path $script:GoatRoot 'src\Recommendations.ps1')
+    . (Join-Path $script:GoatRoot 'src\Selection.ps1')
+    . (Join-Path $script:GoatRoot 'src\ToolAdvisor.ps1')
     . (Join-Path $script:GoatRoot 'src\UI.ps1')
 }
 $script:GoatQa=@{Phase=0;Passed=@();Failure='';Deadline=(Get-Date).AddSeconds(120);ReadOnly=[bool]$RealReadOnly;Screenshots=@();RepositoryCounts=@{};ExternalItemName=''}
@@ -89,6 +97,10 @@ function Test-GoatUiRepositoryPage {
     $ui.Controls.CatalogKindFilter.SelectedItem=$type.Name
     Assert-GoatUi ($ui.Controls.CatalogGrid.Items.Count -eq $type.Count) ("type filter $RepositoryId")
     $ui.Controls.CatalogKindFilter.SelectedIndex=0
+    $status=@($ui.CurrentRepository.Items | Group-Object MachineStatus | Select-Object -First 1)[0]
+    $ui.Controls.CatalogPcFilter.SelectedItem=$status.Name
+    Assert-GoatUi ($ui.Controls.CatalogGrid.Items.Count -eq $status.Count) ("hardware comparison filter $RepositoryId")
+    $ui.Controls.CatalogPcFilter.SelectedIndex=0
     $query=[string]$repository.Items[0].Path
     $expected=@($repository.Items | Where-Object { ('{0} {1} {2} {3} {4}' -f $_.Name,$_.Path,$_.Group,$_.Kind,$_.Description).IndexOf($query,[StringComparison]::OrdinalIgnoreCase) -ge 0 }).Count
     $ui.Controls.CatalogSearchBox.Text=$query
@@ -99,8 +111,63 @@ function Test-GoatUiRepositoryPage {
     $ui.Controls.CatalogSearchBox.Text=''
     Assert-GoatUi ($ui.Controls.CatalogGrid.Items.Count -eq @($repository.Items).Count) ("reset reveals entire $RepositoryId")
     $item=$ui.Controls.CatalogGrid.SelectedItem
+    $advice=$ui.ToolAdvice[$RepositoryId+'|'+$item.Id]
+    Assert-GoatUi ($null -ne $advice) ("selected original $RepositoryId has machine comparison")
+    Assert-GoatUi ($ui.Controls.CatalogItemPcStatus.Text -eq $advice.Status) ("exact machine status $RepositoryId")
+    Assert-GoatUi ($ui.Controls.CatalogItemPcReason.Text -eq $advice.Reason) ("exact machine reason $RepositoryId")
+    Assert-GoatUi ($ui.Controls.CatalogItemName.Text -eq $advice.Alias) ("friendly original alias $RepositoryId")
     Assert-GoatUi ($ui.Controls.CatalogItemPath.Text -eq $item.Path) ("exact path $RepositoryId")
     if ($item.Warning) { Assert-GoatUi ($ui.Controls.CatalogItemWarning.Text -eq $item.Warning) ("exact warning $RepositoryId") }
+}
+
+function Invoke-GoatUiQaCheckClick {
+    param($CheckBox,[bool]$Selected)
+    $CheckBox.IsChecked=$Selected
+    $CheckBox.RaiseEvent((New-Object Windows.RoutedEventArgs([Windows.Controls.Primitives.ButtonBase]::ClickEvent)))
+}
+
+function Test-GoatUiProfileSelection {
+    $ui=$script:GoatUi
+    $scan=$ui.Scan
+    Assert-GoatUi ($ui.Controls.ProfileSelector.SelectedItem -eq 'Jogos') 'gaming profile is default'
+    Assert-GoatUi ([bool]$ui.Controls.PreserveCaptureCheck.IsChecked) 'capture preservation is default'
+    Assert-GoatUi (@($ui.Tweaks | Where-Object {$_.Id -eq 'capture-off' -and $_.Recommended}).Count -eq 0) 'capture not silently preselected'
+    Assert-GoatUi (@($ui.Tweaks | Where-Object {[string]::IsNullOrWhiteSpace([string]$_.RecommendationReason)}).Count -eq 0) 'every native option has selection reason'
+    foreach($recommendation in @($ui.Scan.Recommendations | Where-Object {$_.Status -eq 'Recomendado' -and $_.ActionId})) {
+        $native=@($ui.Tweaks | Where-Object Id -eq $recommendation.ActionId)
+        Assert-GoatUi ($native.Count -eq 0 -or $native[0].Recommended) ('recommendation card follows machine selection '+$recommendation.Id)
+    }
+    $ui.Controls.ProfileSelector.SelectedItem='Equilibrado'
+    Assert-GoatUi ([object]::ReferenceEquals($scan,$ui.Scan) -and -not $ui.Worker) 'profile changes use scan locally without rescan'
+    $target=@($ui.Tweaks | Where-Object {$_.CanDisable -and $_.Available -and -not $_.OffState} | Select-Object -First 1)[0]
+    if ($target) {
+        $ui.DirectionControls[$target.Id].SelectedIndex=1
+        $check=@($ui.Checkboxes | Where-Object Tag -eq $target.Id)[0]
+        Assert-GoatUi ($check.IsEnabled) 'alternate state remains selectable'
+        Invoke-GoatUiQaCheckClick -CheckBox $check -Selected $true
+        $ui.Controls.ProfileSelector.SelectedItem='Jogos'
+        Assert-GoatUi ($ui.Directions[$target.Id] -eq 'Off') 'explicit direction survives profile change'
+        $check=@($ui.Checkboxes | Where-Object Tag -eq $target.Id)[0]
+        Assert-GoatUi ([bool]$check.IsChecked) 'explicit checkbox survives profile change'
+    }
+    $ui.Controls.PreserveCaptureCheck.IsChecked=$false
+    $ui.Controls.PreserveCaptureCheck.RaiseEvent((New-Object Windows.RoutedEventArgs([Windows.Controls.Primitives.ButtonBase]::ClickEvent)))
+    $ui.Controls.ProfileSelector.SelectedItem='Jogos'
+    $capture=@($ui.Tweaks | Where-Object Id -eq 'capture-off')[0]
+    if ($capture.Available -and $capture.State -ne 'Aplicado') {
+        Assert-GoatUi $capture.Recommended 'gaming capture preference needs explicit preservation opt-out'
+        $captureCheck=@($ui.Checkboxes | Where-Object Tag -eq 'capture-off')[0]
+        Invoke-GoatUiQaCheckClick -CheckBox $captureCheck -Selected $false
+        $ui.Controls.ProfileSelector.SelectedItem='Equilibrado'
+        $ui.Controls.ProfileSelector.SelectedItem='Jogos'
+        Assert-GoatUi (-not [bool](@($ui.Checkboxes | Where-Object Tag -eq 'capture-off')[0].IsChecked)) 'explicit uncheck survives recommendation recalculation'
+    }
+    $ui.Controls.SelectRecommendedButton.RaiseEvent((New-Object Windows.RoutedEventArgs([Windows.Controls.Button]::ClickEvent)))
+    Assert-GoatUi ($ui.Selections.Count -eq 0 -and $ui.ManualDirections.Count -eq 0) 'explicit recommended selection resets manual overrides'
+    $ui.Controls.ProfileSelector.SelectedItem='Jogos'
+    $ui.Controls.PreserveCaptureCheck.IsChecked=$true
+    $ui.Controls.PreserveCaptureCheck.RaiseEvent((New-Object Windows.RoutedEventArgs([Windows.Controls.Primitives.ButtonBase]::ClickEvent)))
+    Assert-GoatUi ($ui.Controls.ProfileSummary.Text -like '*FPS não medido*') 'hardware profile makes no measured FPS claim'
 }
 
 $script:GoatUiTestHook={
@@ -115,7 +182,7 @@ $script:GoatUiTestHook={
             if ($ui.Worker -or -not $ui.Scan) { return }
             switch ($script:GoatQa.Phase) {
                 0 {
-                    Assert-GoatUi ($ui.Tweaks.Count -eq 9) 'scanner completed with nine native tweaks including RAM'
+                    Assert-GoatUi ($ui.Tweaks.Count -ge 20) 'scanner completed with expanded native catalog'
                     Assert-GoatUi ($null -ne $ui.Scan.AdvancedState) 'advanced scanner state attached to hardware scan'
                     Assert-GoatUi (@($ui.Scan.Recommendations).Count -gt 0) 'cross-reference recommendations attached to hardware scan'
                     Assert-GoatUi (@($ui.Controls.GetEnumerator() | Where-Object {$_.Key -like 'Nav*' -and $_.Value -is [Windows.Controls.RadioButton]}).Count -eq 13) 'thirteen sidebar areas available'
@@ -135,6 +202,11 @@ $script:GoatUiTestHook={
                     Assert-GoatUi ($ui.Window.Background.Color.ToString() -eq '#FF090909') 'black main theme'
                     Assert-GoatUi ($ui.Controls.ApplyButton.Background.Color.ToString() -eq '#FFE4B95B') 'gold action theme'
                     Assert-GoatUi ($ui.Repositories.Count -eq 4) 'four original catalogs loaded'
+                    $catalogItems=0;foreach($repository in $ui.Repositories.Values){$catalogItems+=@($repository.Items).Count}
+                    Assert-GoatUi (@($ui.Scan.ToolRecommendations).Count -eq $catalogItems) 'every original catalog row was compared with this PC'
+                    Assert-GoatUi ($ui.ToolAdvice.Count -eq $catalogItems) 'machine comparison keys cover every original item'
+                    Assert-GoatUi (@($ui.Scan.ToolRecommendations | Where-Object {$_.Status -notin @('Recomendado','Compatível','Revisão manual','Não aplicável','Referência')}).Count -eq 0) 'external comparison statuses are explicit'
+                    Assert-GoatUi (@($ui.Scan.ToolRecommendations | Where-Object {$_.Status -eq 'Recomendado' -and -not $_.Reviewed}).Count -eq 0) 'unknown external items are never recommended'
                     foreach ($entry in @(@('NavCPU','CPU'),@('NavGPU','GPU'),@('NavRAM','RAM'),@('NavBIOS','BIOS'),@('NavNetwork','Network'),@('NavSystem','System'),@('NavGame','Game'),@('NavDrivers','Drivers'),@('NavHome','Home'))) {
                         $ui.Controls[$entry[0]].IsChecked=$true
                         Assert-GoatUi ($ui.Page -eq $entry[1]) ("navigation $($entry[1])")
@@ -154,6 +226,11 @@ $script:GoatUiTestHook={
                             $renderedCpu=@($ui.Controls.FindingsPanel.Children[0].Child.Children | ForEach-Object Text) -join ' '
                             Assert-GoatUi ($architectureText -and $renderedCpu.Contains($architectureText)) 'CPU findings render reported architecture'
                         }
+                        if ($entry[1] -eq 'System') {
+                            Assert-GoatUi ($ui.Controls.HardwareCard.Visibility -eq 'Collapsed') 'System page dedicates width to native options'
+                            Assert-GoatUi ([Windows.Controls.Grid]::GetColumnSpan($ui.Controls.OptimizerCard) -eq 3) 'System checklist spans full content width'
+                            Assert-GoatUi ($ui.Controls.TweaksScroll.Height -ge 480) 'System checklist exposes multiple options at once'
+                        }
                     }
                     foreach ($entry in @(@('GpuTab','GPU'),@('RamTab','RAM'),@('CpuTab','CPU'))) {
                         $ui.Controls[$entry[0]].IsChecked=$true
@@ -163,6 +240,7 @@ $script:GoatUiTestHook={
                         Test-GoatUiRepositoryPage -ControlName $entry[0] -Page $entry[1] -RepositoryId $entry[2]
                     }
                     $ui.Controls.NavHome.IsChecked=$true
+                    Test-GoatUiProfileSelection
                     $script:GoatQa.Phase=1
                 }
                 1 {
@@ -171,9 +249,14 @@ $script:GoatUiTestHook={
                     Save-GoatUiCapture $ui.Window
                     if ($script:GoatQa.ReadOnly) { $script:GoatQa.Phase=7; return }
                     Assert-GoatUi ($ui.Demo -eq $true) 'mutating test actions limited to Demo'
+                    $target=@($ui.Tweaks | Where-Object {$_.CanDisable -and $_.Available -and -not $_.OffState} | Sort-Object @{Expression={$_.Id -eq 'rss-on'};Descending=$true} | Select-Object -First 1)[0]
+                    $ui.DirectionControls[$target.Id].SelectedIndex=1
+                    $check=@($ui.Checkboxes | Where-Object Tag -eq $target.Id)[0]
+                    Invoke-GoatUiQaCheckClick -CheckBox $check -Selected $true
                     Assert-GoatUi ($ui.Controls.ApplyButton.IsEnabled) 'demo apply button enabled for recommendations'
                     $ui.Controls.ApplyButton.RaiseEvent((New-Object Windows.RoutedEventArgs([Windows.Controls.Button]::ClickEvent)))
                     Assert-GoatUi ($ui.Worker.Kind -eq 'Apply') 'apply dispatched off UI thread'
+                    Assert-GoatUi ($ui.Worker.Directions[$target.Id] -eq 'Off') 'chosen Off direction dispatched to apply worker'
                     $script:GoatQa.Phase=2
                 }
                 2 {
@@ -238,6 +321,34 @@ $script:GoatUiTestHook={
                 }
                 9 {
                     Save-GoatUiCapture -Window $ui.Window -Name 'GOAT-Tweaks-RAM-analysis.png'
+                    $candidates=@($ui.Scan.ToolRecommendations | Where-Object {$_.Status -eq 'Recomendado' -and $_.Category -eq 'GPU'})
+                    if($ui.Demo){Assert-GoatUi ($candidates.Count -gt 0) 'reviewed GPU diagnostic is recommended for demo PC'}
+                    if($candidates.Count -eq 0){$candidates=@($ui.Scan.ToolRecommendations | Where-Object Category -eq 'GPU' | Select-Object -First 1)}
+                    if($candidates.Count -gt 0){
+                        $advice=$candidates[0]
+                        $pages=@{winutil='NavWinutil';winsux='NavWinSux';ultimate='NavUltimate';rytunex='NavRyTuneX'}
+                        $ui.Controls[$pages[$advice.RepositoryId]].IsChecked=$true
+                        $ui.Controls.CatalogPcFilter.SelectedItem=$advice.Status
+                        $ui.Controls.CatalogGrid.SelectedItem=@($ui.CurrentRepository.Items | Where-Object Id -eq $advice.ItemId)[0]
+                        Assert-GoatUi ($ui.Controls.CatalogItemPcStatus.Text -eq $advice.Status) 'GPU diagnostic comparison displayed without execution'
+                    }
+                    $script:GoatQa.Phase=10
+                }
+                10 {
+                    Save-GoatUiCapture -Window $ui.Window -Name 'GOAT-Tweaks-for-this-PC.png'
+                    $ui.Controls.NavHome.IsChecked=$true
+                    $ui.Controls.SelectRecommendedButton.RaiseEvent((New-Object Windows.RoutedEventArgs([Windows.Controls.Button]::ClickEvent)))
+                    Assert-GoatUi ($ui.Checkboxes.Count -eq $ui.Tweaks.Count) 'native overview exposes entire expanded catalog'
+                    $script:GoatQa.Phase=11
+                }
+                11 {
+                    Save-GoatUiCapture -Window $ui.Window -Name 'GOAT-Tweaks-native-options.png'
+                    $ui.Controls.NavSystem.IsChecked=$true
+                    $ui.Controls.TweaksScroll.ScrollToTop()
+                    $script:GoatQa.Phase=12
+                }
+                12 {
+                    Save-GoatUiCapture -Window $ui.Window -Name 'GOAT-Tweaks-system-options.png'
                     $script:GoatQa.Timer.Stop()
                     $ui.Window.Close()
                 }
@@ -254,4 +365,4 @@ $script:GoatUiTestHook={
 
 Show-GoatWindow -Demo:(-not $RealReadOnly)
 if ($script:GoatQa.Failure) { throw $script:GoatQa.Failure }
-[pscustomobject]@{ Passed=$script:GoatQa.Passed.Count; Checks=$script:GoatQa.Passed; RealReadOnly=[bool]$RealReadOnly; Bundle=[bool]$Bundle; RepositoryCounts=$script:GoatQa.RepositoryCounts; Screenshots=$script:GoatQa.Screenshots } | ConvertTo-Json -Depth 4
+[pscustomobject]@{ Passed=$script:GoatQa.Passed.Count; Checks=$script:GoatQa.Passed; RealReadOnly=[bool]$RealReadOnly; Bundle=[bool]$Bundle; NativeOptions=$script:GoatUi.Tweaks.Count; ComparedExternalItems=@($script:GoatUi.Scan.ToolRecommendations).Count; RepositoryCounts=$script:GoatQa.RepositoryCounts; Screenshots=$script:GoatQa.Screenshots } | ConvertTo-Json -Depth 4

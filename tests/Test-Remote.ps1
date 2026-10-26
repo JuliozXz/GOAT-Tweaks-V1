@@ -101,7 +101,7 @@ try {
                 if ($ui.Worker -or -not $ui.Scan -or $ui.Samples.Count -lt 2) { return }
                 Assert-GoatRemote (-not $ui.Demo -and -not $ui.Scan.IsDemo) 'production UI uses real read-only hardware scan'
                 Assert-GoatRemote (-not $ui.Controls.DemoBadge.IsVisible) 'production UI is not labeled demonstration'
-                Assert-GoatRemote ($ui.Tweaks.Count -eq 9) 'embedded engine returned complete native catalog'
+                Assert-GoatRemote ($ui.Tweaks.Count -eq 33) 'embedded engine returned all 33 reviewed native options'
                 Assert-GoatRemote (-not [string]::IsNullOrWhiteSpace([string]$ui.Scan.OS.Caption)) 'real operating system data reached UI'
                 Assert-GoatRemote (-not [string]::IsNullOrWhiteSpace([string]$ui.Scan.CPU.Name)) 'real CPU data reached UI'
                 $measured = @($ui.Samples | Where-Object { $null -ne $_.CPU -or $null -ne $_.RAM -or $null -ne $_.GPU })
@@ -115,6 +115,8 @@ try {
                 Assert-GoatRemote ($null -ne $ui.Controls.GoatLogo.Source) 'embedded original logo rendered'
                 Assert-GoatRemote (@($ui.Scan.Recommendations).Count -ge 20) 'cross-reference recommendations reached production UI'
                 Assert-GoatRemote ($null -ne $ui.Scan.AdvancedState.Readings['memory-compression']) 'RAM compression probe reached production UI'
+                Assert-GoatRemote (@($ui.Scan.ToolRecommendations).Count -eq 1330) 'all original library entries compared for this machine'
+                Assert-GoatRemote ($null -ne $ui.Scan.AdvancedState.Readings['storage'] -and $null -ne $ui.Scan.AdvancedState.Readings['battery']) 'storage and power context reached production UI'
                 Save-GoatRemoteCapture $window
                 $script:GoatRemoteQa.Completed = $true
                 $script:GoatRemoteQa.Timer.Stop()

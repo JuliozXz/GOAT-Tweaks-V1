@@ -18,6 +18,10 @@ foreach ($source in @(
     @{Name='GoatAdvancedScannerSource';File='src\AdvancedScanner.ps1'},
     @{Name='GoatRecommendationSource';File='src\Recommendations.ps1'},
     @{Name='GoatRecommendationJson';File='data\recommendations.json'},
+    @{Name='GoatSelectionSource';File='src\Selection.ps1'},
+    @{Name='GoatToolAdvisorSource';File='src\ToolAdvisor.ps1'},
+    @{Name='GoatNativeOptionsJson';File='data\native-options.json'},
+    @{Name='GoatToolRulesJson';File='data\tool-rules.json'},
     @{Name='GoatIntegrationSource';File='src\Integrations.ps1'},
     @{Name='GoatUiSource';File='src\UI.ps1'},
     @{Name='GoatXaml';File='src\UI.xaml'}
@@ -50,14 +54,14 @@ $parseErrors=$null; $tokens=$null
 if ($parseErrors.Count -gt 0) { throw ($parseErrors | Out-String) }
 $hash=(Get-FileHash -LiteralPath $bundle -Algorithm SHA256).Hash.ToLowerInvariant()
 [IO.File]::WriteAllText((Join-Path $outputRoot 'GOAT-Tweaks.sha256'), "$hash  GOAT-Tweaks.ps1`r`n", (New-Object Text.UTF8Encoding($false)))
-$zip=Join-Path $outputRoot 'GOAT-Tweaks-v2.3.zip'
+$zip=Join-Path $outputRoot 'GOAT-Tweaks-v2.4.zip'
 $packageRoot=Join-Path $outputRoot 'package'
 $packageDocs=Join-Path $packageRoot 'docs'
 [IO.Directory]::CreateDirectory($packageDocs) | Out-Null
 Copy-Item -LiteralPath $bundle -Destination $packageRoot -Force
 Copy-Item -LiteralPath (Join-Path $ProjectRoot 'README.md') -Destination $packageRoot -Force
 Copy-Item -LiteralPath (Join-Path $outputRoot 'GOAT-Tweaks.sha256') -Destination $packageRoot -Force
-foreach ($document in @('REFERENCIAS.md','VALIDACAO.md','RECOMENDACOES.md','INTEGRACOES-WINUTIL-RYTUNEX.md')) { Copy-Item -LiteralPath (Join-Path $ProjectRoot "docs\$document") -Destination $packageDocs -Force }
+foreach ($document in @('REFERENCIAS.md','VALIDACAO.md','RECOMENDACOES.md','INTEGRACOES-WINUTIL-RYTUNEX.md','OPCOES.md')) { Copy-Item -LiteralPath (Join-Path $ProjectRoot "docs\$document") -Destination $packageDocs -Force }
 Compress-Archive -LiteralPath @((Join-Path $packageRoot 'GOAT-Tweaks.ps1'),(Join-Path $packageRoot 'README.md'),$packageDocs,(Join-Path $packageRoot 'GOAT-Tweaks.sha256')) -DestinationPath $zip -Force
 Write-Output "Build concluído: $bundle"
 Write-Output "SHA256: $hash"

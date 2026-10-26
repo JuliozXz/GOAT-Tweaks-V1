@@ -70,11 +70,36 @@ function Get-GoatRecommendations {
     return $results.ToArray()
 }
 
+function Get-GoatRecommendationSelection {
+    param([object[]]$Recommendations,[object[]]$Tweaks)
+    $byId=@{}; foreach ($tweak in $Tweaks) {$byId[[string]$tweak.Id]=$tweak}
+    foreach ($recommendation in $Recommendations) {
+        $copy=$recommendation.PSObject.Copy()
+        if ($copy.ActionId -and $byId.ContainsKey([string]$copy.ActionId)) {
+            $tweak=$byId[[string]$copy.ActionId]
+            if (-not $tweak.Available) {$copy.Status='Indisponível'}
+            elseif ($tweak.OnState) {$copy.Status='Configurado'}
+            elseif ($tweak.Recommended) {$copy.Status='Recomendado'}
+            elseif ($copy.Status -eq 'Recomendado') {$copy.Status='Revisão manual'}
+            if ($tweak.RecommendationReason) {$copy.Detail+=' Seleção para este PC: '+$tweak.RecommendationReason}
+        }
+        $copy
+    }
+}
+
 function Get-GoatUnifiedScan {
     param([switch]$Demo)
     $scan=Get-GoatHardwareScan -Demo:$Demo
     $advanced=Get-GoatAdvancedState -Demo:$Demo -Scan $scan
     $scan | Add-Member -NotePropertyName AdvancedState -NotePropertyValue $advanced -Force
     $scan | Add-Member -NotePropertyName Recommendations -NotePropertyValue @(Get-GoatRecommendations -Scan $scan -AdvancedState $advanced) -Force
+    if (Get-Command Get-GoatMachineProfile -ErrorAction SilentlyContinue) {
+        $scan | Add-Member -NotePropertyName MachineProfile -NotePropertyValue (Get-GoatMachineProfile -Scan $scan) -Force
+        $scan | Add-Member -NotePropertyName NativeTweaks -NotePropertyValue @(Set-GoatTweakRecommendations -Tweaks @(Get-GoatTweaks -Scan $scan) -Scan $scan) -Force
+        $scan.Recommendations=@(Get-GoatRecommendationSelection -Recommendations $scan.Recommendations -Tweaks $scan.NativeTweaks)
+    }
+    if (Get-Command Get-GoatToolRecommendations -ErrorAction SilentlyContinue) {
+        $scan | Add-Member -NotePropertyName ToolRecommendations -NotePropertyValue @(Get-GoatToolRecommendations -Scan $scan -CatalogJson $script:GoatCatalogJson) -Force
+    }
     return $scan
 }

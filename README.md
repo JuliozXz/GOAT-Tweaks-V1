@@ -1,4 +1,4 @@
-# GOAT Tweaks v2.3
+﻿# GOAT Tweaks v2.4
 
 Aplicativo desktop para a bancada técnica GOAT, escrito em Windows PowerShell 5.1 e WPF. Este projeto começa do zero, em pasta própria. A interface e o scanner funcionam sem instalar Node, Python, .NET adicional ou módulos da PowerShell Gallery.
 
@@ -10,7 +10,7 @@ Abra o **Windows PowerShell como administrador** e execute:
 irm 'https://raw.githubusercontent.com/JuliozXz/GOAT-Tweaks-V1/main/dist/GOAT-Tweaks.ps1' | iex
 ```
 
-O comando abre a interface e analisa a máquina; as alterações só começam quando o técnico seleciona as opções e clica em aplicar. Sem elevação, o diagnóstico continua disponível. O repositório mantém o nome `GOAT-Tweaks-V1`, e o aplicativo publicado é a versão **2.3**.
+O comando abre a interface e analisa a máquina; as alterações só começam quando o técnico seleciona as opções e clica em aplicar. Sem elevação, o diagnóstico continua disponível. O repositório mantém o nome `GOAT-Tweaks-V1`, e o aplicativo publicado é a versão **2.4**.
 
 ## Abrir
 
@@ -37,12 +37,25 @@ O executável de PowerShell 7 relança automaticamente o script salvo usando Win
 - Scanner em segundo plano: CPU, núcleos/threads, GPU, configuração MSI declarada pelo driver, prioridade declarada, RAM, placa-mãe, BIOS, Windows, rede, plano de energia e inventário de drivers.
 - Histórico de utilização de CPU/GPU/RAM nos últimos 60 segundos, conforme disponibilidade dos provedores do Windows. GPU mostra o maior uso de motor 3D observado, não uma média entre motores. Ausência de dados aparece como indisponível.
 - Detecção por nomes conhecidos de processos de jogos; a lista não é universal e não injeta nada no jogo.
-- Nove opções transacionais: compressão de memória, Modo de Jogo, captura em segundo plano, efeitos visuais, aceleração do ponteiro, apps UWP em segundo plano, plano Alto Desempenho existente, auto-tuning TCP do perfil Internet e RSS global.
+- 33 opções integradas: as nove opções anteriores e 24 controles revisados de Explorer, interface, entrada, privacidade e distribuição de downloads. Trinta oferecem dois estados explícitos; o botão Restaurar continua recuperando o estado capturado antes da alteração.
+- Perfil de uso Jogos/Equilibrado, preservação de gravação e pré-seleção explicada conforme RAM, disponibilidade, armazenamento, rede e energia. Preferências pessoais permanecem manuais; selecionar mais itens não equivale a mais desempenho.
 - Análise cruzada em segundo plano por RAM, CPU, GPU, BIOS, rede, sistema e drivers. Uma matriz revisada associa as leituras do Windows às fontes dos quatro projetos, elimina recomendações duplicadas e identifica divergências.
 - Links oficiais de ferramentas e drivers. O aplicativo abre a página; a instalação continua sob acompanhamento do técnico.
 - Registro de comandos/valores alterados, backup dos valores e tipos originais, verificação após cada escrita, reversão em falha e retomada da restauração de operações interrompidas.
 
-As duas sugestões de preferências de jogos só são selecionadas quando seus valores ainda não estão configurados. A compressão de memória é sugerida quando a leitura confirma que está desativada; o estado desconhecido bloqueia sua aplicação. Revise a captura caso o cliente use gravação de clipes. Não são uma previsão de ganho de FPS.
+A interface começa no perfil Jogos, preservando gravação e clipes. Compressão desativada só é pré-selecionada quando há até 8 GB de RAM ou pouca RAM disponível na amostra. Em máquinas sem essa condição, ela fica manual. Preferências já configuradas e leituras desconhecidas não viram novas alterações. O técnico pode trocar de perfil, ajustar cada direção e usar **Selecionar recomendados** para reaplicar a seleção calculada. Escolhas manuais são preservadas ao trocar de perfil.
+
+As 24 opções novas incluem preferências de interface e privacidade; não são 24 otimizações de FPS. A origem, o efeito e os dois estados estão descritos em [Opções integradas](docs/OPCOES.md). **Usar padrão** remove uma preferência específica; **Restaurar** recupera o valor anterior registrado, que pode ser diferente do padrão.
+
+## Comparação dos scripts e executáveis para cada PC
+
+Cada análise percorre os **1.330 itens** das quatro bibliotecas. A versão 2.4 possui **44 regras individuais revisadas** para scripts e ferramentas. O resultado aparece na lista e no detalhe como **Recomendado**, **Compatível**, **Revisão manual**, **Não aplicável** ou **Referência**, com filtro próprio e justificativa para a máquina detectada.
+
+Regras de fabricante usam a GPU ou CPU correspondente: um processador AMD não implica uma placa de vídeo AMD. Múltiplas GPUs e drivers genéricos são tratados sem converter falta de informação em incompatibilidade. Arquitetura desconhecida permanece para revisão. Ferramentas equivalentes são agrupadas para evitar sugerir diagnósticos repetidos.
+
+As sugestões automáticas externas são limitadas a três launchers revisados de diagnóstico de GPU, CPU/RAM e armazenamento. Otimizadores amplos, instaladores, drivers e itens sem regra individual não são declarados “os melhores” pelo nome. Eles permanecem acessíveis para revisão. Assim, **comparar todos os registros não significa que todos os scripts foram certificados, convertidos em botões nativos ou medidos em todos os PCs**.
+
+O scanner não mede FPS nem executa jogos/benchmarks automaticamente. Para afirmar melhoria, compare a mesma cena, jogo, resolução e configurações antes/depois, incluindo tempos de quadro; ferramentas como [PresentMon](https://github.com/GameTechDev/PresentMon/blob/main/README.md) fornecem medições para essa validação. Nenhuma regra garante ganho em todo hardware.
 
 ## Análise cruzada por área
 
@@ -109,7 +122,7 @@ O código do GOAT é próprio. As quatro categorias mantêm a origem e a licenç
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Build.ps1
 ```
 
-Saídas: `dist\GOAT-Tweaks.ps1` independente, `dist\GOAT-Tweaks.sha256` e `dist\GOAT-Tweaks-v2.3.zip`. O arquivo independente inclui scanner, engine, XAML, logo e catálogo. O transporte gerado é ASCII sem BOM, com recursos UTF-8 codificados em Base64 e catálogo comprimido em GZip, decodificados em memória. Isso preserva os textos em português no `irm | iex` do PowerShell 5.1 mesmo quando o servidor não envia charset. O código legível de cada módulo está em `src/`.
+Saídas: `dist\GOAT-Tweaks.ps1` independente, `dist\GOAT-Tweaks.sha256` e `dist\GOAT-Tweaks-v2.4.zip`. O arquivo independente inclui scanner, engine, XAML, logo e catálogo. O transporte gerado é ASCII sem BOM, com recursos UTF-8 codificados em Base64 e catálogo comprimido em GZip, decodificados em memória. Isso preserva os textos em português no `irm | iex` do PowerShell 5.1 mesmo quando o servidor não envia charset. O código legível de cada módulo está em `src/`.
 
 O endereço publicado aponta diretamente para **o arquivo gerado**, que não depende dos arquivos locais de `src/`:
 
@@ -127,6 +140,9 @@ powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -File .\tests\Test-UI.ps1
 powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -File .\tests\Test-Integrations.ps1
 powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -File .\tests\Test-AdvancedScanner.ps1
 powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -File .\tests\Test-Recommendations.ps1
+powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -File .\tests\Test-Selection.ps1
+powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -File .\tests\Test-OptionData.ps1
+powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -File .\tests\Test-ToolAdvisor.ps1 -RequireActualRules
 ```
 
 Os testes da engine substituem as APIs de alteração e os checkpoints por simuladores em memória. O teste de UI usa demonstração para verificar navegação, gráfico, aplicação simulada e restauração simulada, e gera capturas em `artifacts\`. Testes não aplicam tweaks reais. O parâmetro `-RealReadOnly` verifica a UI com consultas reais, e `-Bundle` verifica a versão independente. Consulte [o relatório de validação](docs/VALIDACAO.md).

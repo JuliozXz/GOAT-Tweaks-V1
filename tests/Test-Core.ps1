@@ -3,6 +3,7 @@ param()
 
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot '..\src\Core.ps1')
+$script:GoatNativeOptionsJson=Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\data\native-options.json') -Raw -Encoding UTF8
 $script:OriginalWriteGoatLog = (Get-Item Function:Write-GoatLog).ScriptBlock
 
 # These tests exercise the actual catalog, write-ahead journal, allowlist,
@@ -11,7 +12,7 @@ $script:SandboxParent = [IO.Path]::GetFullPath([IO.Path]::GetTempPath())
 $script:Sandbox = Join-Path $script:SandboxParent ('GOAT-CoreTests-' + [Guid]::NewGuid().ToString('N'))
 [IO.Directory]::CreateDirectory($script:Sandbox) | Out-Null
 $script:Passed = 0
-$script:Scan = [pscustomobject]@{ IsDemo=$false; OS=[pscustomobject]@{ Supported=$true }; Power=[pscustomobject]@{ IsLaptop=$false } }
+$script:Scan = [pscustomobject]@{ IsDemo=$false; OS=[pscustomobject]@{ Supported=$true;Build=19045 }; Power=[pscustomobject]@{ IsLaptop=$false } }
 
 function Assert-Test {
     param([bool]$Condition, [string]$Message)
@@ -61,7 +62,7 @@ function Add-TestRegistryValue {
 function Get-TestJournal {
     $backupRoot = Join-Path $script:TestRoot 'backups'
     if (-not (Test-Path -LiteralPath $backupRoot)) { return $null }
-    foreach ($file in @(Get-ChildItem -LiteralPath $backupRoot -Filter '*.json' -File | Sort-Object Name -Descending)) {
+    foreach ($file in @(Get-ChildItem -LiteralPath $backupRoot -Filter '*.json' -File | Sort-Object LastWriteTimeUtc -Descending)) {
         $candidate = Get-Content -LiteralPath $file.FullName -Raw -Encoding UTF8 | ConvertFrom-Json
         if ($candidate.MachineGuid -eq $script:MachineGuid -and $candidate.UserSid -eq $script:UserSid) { return $candidate }
     }
@@ -339,6 +340,45 @@ try {
     }
     Assert-Test ($script:WriteCount -eq 0) 'Demo catalog cannot write Windows state.'
     Complete-Test 'Demo recommendations and native states agree across JSON round-trip'
+
+    Reset-TestScenario 'disable-configured-memory'
+    $script:MemoryCompression=$true
+    $result=Invoke-GoatApply -Ids @('memory-compression') -Scan $script:Scan -Directions @{'memory-compression'='Off'}
+    Assert-Test ($result.Success -and -not $script:MemoryCompression) 'Explicit Off must disable a currently enabled compression state.'
+    $undo=Restore-GoatLastTransaction
+    Assert-Test ($undo.Success -and $script:MemoryCompression) 'Undo Off must restore the true original.'
+    Complete-Test 'Explicit Off applies and restores an already configured native option'
+
+    Reset-TestScenario 'native-option-on-off-undo'
+    $native=@(Get-GoatTweaks -Scan $script:Scan | Where-Object Id -eq 'file-extensions')[0]
+    Assert-Test ($native.CanDisable -and $native.Available) 'Reviewed native file option must expose both states.'
+    $result=Invoke-GoatApply -Ids @('file-extensions') -Scan $script:Scan -Directions @{'file-extensions'='On'}
+    Assert-Test ($result.Success) 'New native On must commit.'
+    $result=Invoke-GoatApply -Ids @('file-extensions') -Scan $script:Scan -Directions @{'file-extensions'='Off'}
+    Assert-Test ($result.Success) 'New native Off must commit.'
+    $undo=Restore-GoatLastTransaction
+    Assert-Test ($undo.Success -and (Test-GoatRegistryTargetsMatch $native.Targets)) 'Undo restores the state before Off, not guessed defaults.'
+    Complete-Test 'Reviewed native option toggles both directions and restores prior state'
+
+    Reset-TestScenario 'invalid-directions'
+    $result=Invoke-GoatApply -Ids @('memory-compression') -Scan $script:Scan -Directions @{'memory-compression'='Maybe'}
+    $unavailable=Invoke-GoatApply -Ids @('tcp-normal') -Scan $script:Scan -Directions @{'tcp-normal'='Off'}
+    Assert-Test (-not $result.Success -and -not $unavailable.Success -and $script:WriteCount -eq 0 -and $script:CheckpointCalls -eq 0) 'Unknown and unsupported directions must fail before checkpoint or mutation.'
+    Complete-Test 'Unreviewed directions are rejected before mutation'
+
+    Reset-TestScenario 'restore-chronology'
+    $result=Invoke-GoatApply -Ids @('file-extensions') -Scan $script:Scan
+    Assert-Test ($result.Success) 'Chronology fixture must apply.'
+    $older=Get-TestJournal
+    $older.CreatedUtc='2026-10-26T12:00:00.1000000Z'
+    Write-GoatJournal $older (Join-Path $script:TestRoot ('backups\'+$older.Id+'.json'))
+    $newer=$older|ConvertTo-Json -Depth 16|ConvertFrom-Json
+    $newer.Id='00000000-newer'
+    $newer.CreatedUtc='2026-10-26T12:00:00.9000000Z'
+    Write-GoatJournal $newer (Join-Path $script:TestRoot 'backups\00000000-newer.json')
+    $undo=Restore-GoatLastTransaction
+    Assert-Test ($undo.Success -and $undo.TransactionId -eq '00000000-newer') 'Restore must use newest captured timestamp even when filename sorts first and both entries share a second.'
+    Complete-Test 'Restore orders transactions by captured timestamp rather than random filename suffix'
 
     Write-Output "PASS: $script:Passed transaction tests; no Windows settings were changed."
 }

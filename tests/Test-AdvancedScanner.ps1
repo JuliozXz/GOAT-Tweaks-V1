@@ -12,7 +12,7 @@ if($RealReadOnly){
     $scan=Get-GoatHardwareScan
     $clock=[Diagnostics.Stopwatch]::StartNew()
     $advanced=Get-GoatAdvancedState -Scan $scan
-    Assert-Advanced ($advanced.Readings.Count -eq 21) 'Real scanner must return all 21 keys even if APIs are unavailable.'
+    Assert-Advanced ($advanced.Readings.Count -eq 23) 'Real scanner must return all 23 keys even if APIs are unavailable.'
     foreach($key in $advanced.Readings.Keys){
         $reading=$advanced.Readings[$key]
         Assert-Advanced ($null -ne $reading.Text -and $null -ne $reading.Available) ('Invalid real reading: '+$key)
@@ -35,6 +35,7 @@ function Invoke-GoatAdvancedReadCommand {
     if($script:ProbeMode -eq 'blocked'){throw 'SIMULATED: command provider unavailable'}
     switch($Command){
         'Get-MMAgent'{return [pscustomobject]@{MemoryCompression=$false}}
+        'Get-PhysicalDisk'{return [pscustomobject]@{FriendlyName='Mock disk';MediaType='SSD';BusType='NVMe';Size=512GB}}
         'Get-CimInstance'{
             switch($Parameters.ClassName){
                 'Win32_Processor'{return [pscustomobject]@{Architecture=9;NumberOfCores=6;NumberOfLogicalProcessors=12}}
@@ -72,8 +73,12 @@ function Get-GoatAdvancedTempObservation {
     if($script:ProbeMode -eq 'blocked'){throw 'SIMULATED: TEMP not readable'}
     return [pscustomobject]@{Path='C:\MOCK\TEMP';BytesObserved=42;FilesObserved=1;DirectoriesVisited=1;Truncated=$true;Errors=@();DurationMs=1}
 }
+function Get-GoatAdvancedPowerContext {
+    if($script:ProbeMode -eq 'blocked'){throw 'SIMULATED: power source unknown'}
+    return [pscustomobject]@{OnBattery=$false;OnAC=$true;HasBattery=$false;ACLineStatus='Online';BatteryChargeStatus='NoSystemBattery';BatteryPercent=$null;Source='Mock'}
+}
 
-$expected=@('memory-compression','system-cache','cpu-architecture','core-parking','process-scheduling','msi-gpu','msi-storage','hags','rebar','cstates','timers','network-autotuning','rss','qos','adapter-power','windows-update','services','appx','cache','explorer','drivers')
+$expected=@('memory-compression','system-cache','cpu-architecture','core-parking','process-scheduling','msi-gpu','msi-storage','hags','rebar','cstates','timers','network-autotuning','rss','qos','adapter-power','windows-update','services','appx','cache','explorer','drivers','storage','battery')
 $fixtureScan=[pscustomobject]@{GPU=@([pscustomobject]@{Name='Mock GPU';PnpDeviceId='PCI\GPU';MsiEnabled=$null;InterruptPriority=$null});Drivers=@([pscustomobject]@{DeviceName='Mock';DriverVersion='1';DriverDate=$null;Manufacturer='Mock'});Errors=@()}
 
 $demo=Get-GoatAdvancedState -Demo
@@ -109,7 +114,7 @@ Complete-Advanced 'Successful probes preserve false, absent/default, raw flags a
 
 $script:ProbeMode='blocked'
 $failed=Get-GoatAdvancedState -Scan $fixtureScan
-foreach($key in @('memory-compression','system-cache','cpu-architecture','core-parking','process-scheduling','msi-storage','hags','timers','network-autotuning','rss','qos','adapter-power','windows-update','services','appx','cache','explorer')){
+foreach($key in @('memory-compression','system-cache','cpu-architecture','core-parking','process-scheduling','msi-storage','hags','timers','network-autotuning','rss','qos','adapter-power','windows-update','services','appx','cache','explorer','storage','battery')){
     Assert-Advanced (-not $failed.Readings[$key].Available -and $null -eq $failed.Readings[$key].Value -and $failed.Readings[$key].Error) ('Failure fabricated a state: '+$key)
 }
 Assert-Advanced ($failed.Readings['drivers'].Available -and $failed.Readings['msi-gpu'].Available) 'One failed provider must not discard existing hardware-scan facts.'

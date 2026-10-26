@@ -4,11 +4,13 @@
 # https://learn.microsoft.com/en-us/powershell/module/netqos/get-netqospolicy?view=windowsserver2025-ps
 # https://learn.microsoft.com/en-us/powershell/module/appx/get-appxpackage
 # https://learn.microsoft.com/en-us/windows-hardware/drivers/devtest/bcdedit--set
+# https://learn.microsoft.com/en-us/windows-hardware/drivers/storage/msft-physicaldisk
+# https://learn.microsoft.com/en-us/windows/win32/api/winbase/ns-winbase-system_power_status
 
 function Invoke-GoatAdvancedReadCommand {
     [CmdletBinding()]
     param([string]$Command,[hashtable]$Parameters=@{},[string[]]$Properties=@(),[int]$First=0,[int]$TimeoutMilliseconds=2500)
-    $allowed=@('Get-MMAgent','Get-CimInstance','Get-NetTCPSetting','Get-NetOffloadGlobalSetting','Get-NetQosPolicy','Get-NetAdapterPowerManagement','Get-AppxPackage')
+    $allowed=@('Get-MMAgent','Get-CimInstance','Get-NetTCPSetting','Get-NetOffloadGlobalSetting','Get-NetQosPolicy','Get-NetAdapterPowerManagement','Get-AppxPackage','Get-PhysicalDisk')
     if ($Command -notin $allowed) { throw 'Consulta avançada fora da lista permitida.' }
     $pipeline=[PowerShell]::Create(); $pending=$null
     try {
@@ -121,6 +123,44 @@ function New-GoatAdvancedReading {
     return [pscustomobject]@{Available=$Available;Value=$Value;Text=$Text;Error=$Error}
 }
 
+function Get-GoatAdvancedPowerContext {
+    # .NET wraps GetSystemPowerStatus; loading the installed assembly does not
+    # compile a helper or change settings. Unknown is retained as null.
+    Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop
+    $status=[System.Windows.Forms.SystemInformation]::PowerStatus
+    $line=[string]$status.PowerLineStatus
+    $charge=[int]$status.BatteryChargeStatus
+    $hasBattery=$null; $onBattery=$null; $onAC=$null; $percentage=$null
+    if($charge -ne 255){$hasBattery=(($charge -band 128)-eq 0)}
+    if($line -eq 'Online'){$onAC=$true;$onBattery=$false}
+    elseif($line -eq 'Offline'){$onAC=$false;if($null -ne $hasBattery){$onBattery=[bool]$hasBattery}}
+    if($null -ne $hasBattery -and $hasBattery -and $status.BatteryLifePercent -ge 0 -and $status.BatteryLifePercent -le 1){$percentage=[math]::Round(100*$status.BatteryLifePercent)}
+    return [pscustomobject]@{OnBattery=$onBattery;OnAC=$onAC;HasBattery=$hasBattery;ACLineStatus=$line;BatteryChargeStatus=[string]$status.BatteryChargeStatus;BatteryPercent=$percentage;Source='GetSystemPowerStatus / SystemInformation.PowerStatus'}
+}
+
+function Get-GoatAdvancedStorageContext {
+    $primaryError=''
+    try{
+        $disks=@(Invoke-GoatAdvancedReadCommand 'Get-PhysicalDisk' @{} @('FriendlyName','MediaType','BusType','Size') -First 32)
+        if($disks.Count -eq 0){throw 'Nenhum PhysicalDisk retornado.'}
+        $items=@($disks|ForEach-Object{
+            $type='Unknown'
+            switch(([string]$_.MediaType).ToUpperInvariant()){'3'{$type='HDD'};'HDD'{$type='HDD'};'4'{$type='SSD'};'SSD'{$type='SSD'};'5'{$type='SCM'};'SCM'{$type='SCM'}}
+            [pscustomobject]@{Name=$_.FriendlyName;MediaType=$type;MediaTypeKnown=($type-ne 'Unknown');BusType=[string]$_.BusType;Size=$_.Size;Source='Get-PhysicalDisk'}
+        })
+        return [pscustomobject]@{Disks=$items;Source='Get-PhysicalDisk';Fallback=$false;PrimaryError=''}
+    }
+    catch{$primaryError=$_.Exception.Message}
+    $fallback=@(Invoke-GoatAdvancedReadCommand 'Get-CimInstance' @{ClassName='Win32_DiskDrive';OperationTimeoutSec=2} @('Model','InterfaceType','MediaType','Size') -First 32)
+    if($fallback.Count -eq 0){throw ('Inventário de armazenamento indisponível. '+$primaryError)}
+    $items=@($fallback|ForEach-Object{
+        # Win32_DiskDrive.MediaType describes fixed/removable, not HDD/SSD.
+        # Model and NVMe-looking names are never used to guess the media type.
+        [pscustomobject]@{Name=$_.Model;MediaType='Unknown';MediaTypeKnown=$false;BusType=[string]$_.InterfaceType;Size=$_.Size;Source='Win32_DiskDrive'}
+    })
+    return [pscustomobject]@{Disks=$items;Source='Win32_DiskDrive';Fallback=$true;PrimaryError=$primaryError}
+}
+
 function Get-GoatAdvancedState {
     [CmdletBinding()]
     param([switch]$Demo,$Scan)
@@ -148,6 +188,8 @@ function Get-GoatAdvancedState {
             'cache'=@($true,[pscustomobject]@{Path='C:\Demo\Temp';BytesObserved=1048576;FilesObserved=12;DirectoriesVisited=2;Truncated=$true;Errors=@();DurationMs=0},'Amostra de TEMP: 1 MB / 12 arquivos (exemplo limitado). Não representa espaço garantido recuperável.')
             'explorer'=@($true,@{SeparateProcess=[pscustomobject]@{Exists=$false;Value=$null;Type=$null};StartupDelayInMSec=[pscustomobject]@{Exists=$false;Value=$null;Type=$null}},'Preferências de Explorer ausentes no exemplo; Windows/usuário definem os padrões.')
             'drivers'=@($true,@([pscustomobject]@{DeviceName='GPU de exemplo';DriverVersion='Exemplo';DriverDate=$null;Manufacturer='Fabricante'}),'Inventário demonstrativo, sem afirmar que o driver é o mais recente.')
+            'storage'=@($true,[pscustomobject]@{Disks=@([pscustomobject]@{Name='SSD de exemplo';MediaType='SSD';MediaTypeKnown=$true;BusType='NVMe';Size=512GB;Source='Demonstração'});Source='Demonstração';Fallback=$false;PrimaryError=''},'SSD/NVMe declarado no exemplo; tipo de mídia não é benchmark.')
+            'battery'=@($true,[pscustomobject]@{OnBattery=$false;OnAC=$true;HasBattery=$false;ACLineStatus='Online';BatteryChargeStatus='NoSystemBattery';BatteryPercent=$null;Source='Demonstração'},'Exemplo conectado à energia, sem bateria de sistema.')
         }
         foreach ($key in $fixture.Keys) { $entry=$fixture[$key]; $readings[$key]=New-GoatAdvancedReading ([bool]$entry[0]) $entry[1] ('DEMONSTRAÇÃO: '+$entry[2]) }
         return [pscustomobject]@{Readings=$readings;Errors=@();Timestamp=[DateTime]::Parse('2026-10-26T00:00:00Z').ToUniversalTime();IsDemo=$true}
@@ -273,6 +315,20 @@ function Get-GoatAdvancedState {
             if(@($Scan.Drivers).Count -eq 0 -and @($Scan.Errors|Where-Object{$_ -match 'PnPSignedDriver'}).Count -gt 0){throw 'Consulta de drivers falhou no scanner de hardware.'}
             $drivers=@($Scan.Drivers | Select-Object DeviceName,DriverVersion,DriverDate,Manufacturer)
             New-GoatAdvancedReading $true $drivers ("$($drivers.Count) registros de drivers instalados. Versão/data não comprova atualização; confirme no site do fabricante.")
+        }
+        'storage'={
+            $value=Get-GoatAdvancedStorageContext
+            $known=@($value.Disks|Where-Object MediaTypeKnown).Count
+            $text="$($value.Disks.Count) disco(s) inventariado(s), $known com tipo de mídia declarado. HDD/SSD desconhecido não é inferido por modelo; o volume do Windows/jogo não foi mapeado."
+            if($value.Fallback){$text+=' Provedor principal indisponível; fallback CIM preserva o tipo como desconhecido.'}
+            New-GoatAdvancedReading $true $value $text $value.PrimaryError
+        }
+        'battery'={
+            $value=Get-GoatAdvancedPowerContext
+            $text='Alimentação: '+$value.ACLineStatus+'. '
+            if($value.OnBattery -is [bool]){$text+=$(if($value.OnBattery){'Operando na bateria.'}else{'Sem descarga de bateria informada.'})}
+            else{$text+='Descarga de bateria desconhecida; nenhuma condição AC é inferida.'}
+            New-GoatAdvancedReading $true $value $text
         }
     }
     foreach($entry in $probes.GetEnumerator()) {
