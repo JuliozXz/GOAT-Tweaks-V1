@@ -15,11 +15,14 @@ if ($PSVersionTable.PSEdition -ne 'Desktop' -or -not [Environment]::Is64BitProce
 . ([scriptblock]::Create($script:GoatCoreSource))
 . ([scriptblock]::Create($script:GoatScannerSource))
 . ([scriptblock]::Create($script:GoatAdvancedScannerSource))
+. ([scriptblock]::Create($script:GoatGpuCenterSource))
 . ([scriptblock]::Create($script:GoatRecommendationSource))
 . ([scriptblock]::Create($script:GoatSelectionSource))
 . ([scriptblock]::Create($script:GoatToolAdvisorSource))
 if ($ScanOnly) {
-    Get-GoatUnifiedScan -Demo:$Demo | ConvertTo-Json -Depth 16
+    $result = Get-GoatUnifiedScan -Demo:$Demo
+    $result | Add-Member -NotePropertyName 'GpuCenter' -NotePropertyValue (Get-GoatGpuCenter -Demo:$Demo) -Force
+    $result | ConvertTo-Json -Depth 16
     return
 }
 . ([scriptblock]::Create($script:GoatIntegrationSource))
