@@ -5,6 +5,7 @@ param([switch]$Demo, [switch]$ScanOnly)
 $script:GoatRoot = $PSScriptRoot
 $script:GoatLaunchPath = $PSCommandPath
 $script:GoatScannerSource = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'src\Scanner.ps1') -Raw -Encoding UTF8
+$script:GoatGpuCenterSource = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'src\GpuCenter.ps1') -Raw -Encoding UTF8
 $script:GoatAdvancedScannerSource = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'src\AdvancedScanner.ps1') -Raw -Encoding UTF8
 $script:GoatRecommendationSource = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'src\Recommendations.ps1') -Raw -Encoding UTF8
 $script:GoatRecommendationJson = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'data\recommendations.json') -Raw -Encoding UTF8
