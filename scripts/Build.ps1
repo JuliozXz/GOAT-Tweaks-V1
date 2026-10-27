@@ -16,6 +16,7 @@ foreach ($source in @(
     @{Name='GoatCoreSource';File='src\Core.ps1'},
     @{Name='GoatScannerSource';File='src\Scanner.ps1'},
     @{Name='GoatAdvancedScannerSource';File='src\AdvancedScanner.ps1'},
+    @{Name='GoatGpuCenterSource';File='src\GpuCenter.ps1'},
     @{Name='GoatRecommendationSource';File='src\Recommendations.ps1'},
     @{Name='GoatRecommendationJson';File='data\recommendations.json'},
     @{Name='GoatSelectionSource';File='src\Selection.ps1'},
