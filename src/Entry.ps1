@@ -11,8 +11,9 @@ if($PSVersionTable.PSEdition -ne 'Desktop' -or -not [Environment]::Is64BitProces
     if($LASTEXITCODE -ne 0){throw ('Falha ao iniciar Windows PowerShell: '+$LASTEXITCODE)}
     return
 }
-foreach($name in @('Core','Gpu','Inventory','Benchmark','Reports','Presentation')){. ([scriptblock]::Create($script:GoatSources[$name]))}
+foreach($name in @('Core','Gpu','Inventory','AdvancedGuides','Power','Runtime','Benchmark','Reports','Presentation')){. ([scriptblock]::Create($script:GoatSources[$name]))}
 $script:GoatCoreSource=$script:GoatSources.Core
+$script:GoatPowerSource=$script:GoatSources.Power
 if($ScanOnly){Get-GoatCompleteInventory -Demo:$Demo|ConvertTo-Json -Depth 24;return}
 . ([scriptblock]::Create($script:GoatSources.App))
 Show-GoatApp -Demo:$Demo -DataRoot $DataRoot -SessionPath $SessionPath

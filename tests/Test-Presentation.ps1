@@ -24,7 +24,7 @@ Assert-Presentation ($profileText -match 'GUIDANCE_ONLY' -and $profileText -matc
 Assert-Presentation ($profileText -match 'NOT_MEASURED' -and $profileText -match 'nenhuma configuração') 'profile never presents an applied tweak or measured benefit'
 $item=[pscustomobject]@{id='WIN-TEST';title='Fixture preference';category='Windows';short_explanation='Explained text';how_it_works='Fixture behavior';potential_benefit='No measured FPS';risk='Baixo';implementation_status='SPEC_ONLY_NOT_YET_VERIFIED';execution_class='C_MANUAL';rollback='Restore exact original';source_path='fixture.md';source_sha256=('a'*64);sources=@('https://example.com/official');apply_allowed=$true;apply_steps='throw "THIS MUST NEVER EXECUTE"'}
 $catalog=Format-GoatCatalogView $item
-Assert-Presentation ($catalog -match 'SPEC_ONLY_NOT_YET_VERIFIED' -and $catalog -match 'apply_allowed: false' -and $catalog -match 'WIN-TEST') 'catalog keeps inactive execution gate and status'
+Assert-Presentation ($catalog -match 'SPEC_ONLY_NOT_YET_VERIFIED' -and $catalog -match 'RECURSO DISPONÍVEL' -and $catalog -match 'somente os executores' -and $catalog -match 'WIN-TEST') 'catalog distinguishes source documentation from runtime executors'
 Assert-Presentation ($catalog -match 'Explained text' -and $catalog -match 'Restore exact original' -and $catalog -match 'fixture.md' -and $catalog -match ('a'*64)) 'catalog explanation rollback and provenance visible'
 Assert-Presentation ($catalog -notmatch 'THIS MUST NEVER EXECUTE' -and $catalog -notmatch 'source_record') 'catalog raw instructions are not exposed as executable controls'
 $emptyBenchmark=Format-GoatBenchmarkView -Captures @()

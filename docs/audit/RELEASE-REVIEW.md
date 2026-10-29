@@ -1,5 +1,7 @@
 # Revisão documental e de release — GOAT Tweaks 7.3.0
 
+> Registro histórico da versão 7.3.0. A ampliação autorizada pelo usuário está em [RELEASE-7.4.0-REVIEW.md](RELEASE-7.4.0-REVIEW.md); o escopo e os critérios atuais estão na matriz funcional e na validação da versão atual.
+
 Data de referência: 28/10/2026. Esta revisão confronta o pacote documental original, o código do aplicativo e fontes técnicas primárias. Nenhum arquivo do pacote original foi alterado e nenhum script upstream foi executado.
 
 ## Parecer e significado da versão oficial

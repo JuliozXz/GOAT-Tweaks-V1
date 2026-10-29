@@ -30,7 +30,7 @@ function Read-GoatPackedResource([string]$Value){
 $script:GoatSources=@{}
 '@.Replace('__VERSION__',$version))
 $manifest=@()
-foreach($name in @('Core','Gpu','Inventory','Benchmark','Reports','Presentation','App')){
+foreach($name in @('Core','Gpu','Inventory','AdvancedGuides','Power','Runtime','Benchmark','Reports','Presentation','App')){
     $file=Join-Path $root ('src\'+$name+'.ps1');$source=Get-Content -LiteralPath $file -Raw -Encoding UTF8
     $errors=$null;$tokens=$null;[void][Management.Automation.Language.Parser]::ParseInput($source,[ref]$tokens,[ref]$errors)
     if($errors.Count){throw ($errors|Out-String)}

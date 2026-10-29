@@ -1,46 +1,71 @@
-# Matriz funcional desta entrega
+# Matriz funcional — GOAT Tweaks 7.4.0
 
-Este app foi escrito do zero em PowerShell/WPF. A versao oficial 7.3.0 cobre os fluxos implementados: uma unica aplicacao integra inventario, GPU Center, catalogo, referencias, sessoes, analise de capturas e exportacao. A navegacao possui 16 paginas; isso nao significa 16 motores de otimizacao automaticos. Parte das paginas exibe dados estruturados e orientacoes.
+O aplicativo reúne diagnóstico, catálogo, referências, perfis consultivos, medições importadas, transações e relatórios. As 18 páginas reúnem diagnóstico, execução e procedimentos assistidos. Há **16 executores de Registro**, **seleção de plano de energia existente** e um guia adicional de animações; cada operação declara seu escopo.
 
-## As 16 paginas
-
-| Pagina | Disponivel no codigo | Limite atual |
+| Página | Disponível | Limite |
 | --- | --- | --- |
-| Visao geral | Resumo de OS/CPU/GPU/RAM e hipoteses de diagnostico baseadas no inventario | Snapshot e hipoteses; nao mede FPS ou input lag |
-| Atendimento | Sessao local persistida, objetivo, modo local/remoto e consentimento contextual | Sem CRM, identidade de cliente ou atendimento remoto embutido |
-| Catalogo completo | Busca/filtros dos 344 registros, explicacoes, risco, classe, origem e conteudo fonte | Todos permanecem `SPEC_ONLY_NOT_YET_VERIFIED`; nenhum texto documental e executado |
-| Windows / preferencias | Previa, simulacao e engine de transacao para mostrar extensoes e mostrar arquivos ocultos | Duas preferencias nativas, sem ganho de FPS alegado; ambas `IMPLEMENTED_NOT_VALIDATED`, `ReleaseEnabled=false` e aplicacao real bloqueada |
-| CPU / RAM | Topologia, memoria e contadores disponiveis, com origem e indisponibilidade explicitas | Sem OC, undervolt, ajuste de afinidade/prioridade, limpeza de RAM ou diagnostico automatico conclusivo de gargalo |
-| GPU CENTER | Inventario PCI/PnP e driver instalado, metadados de monitores, fontes oficiais e guias NVIDIA/AMD/Intel/OEM; motores GPU quando expostos | Sem instalacao/remocao de driver, consulta automatica de versao mais recente, VRAM deduzida de AdapterRAM ou temperatura inventada; capacidades nao confirmadas ficam `UNKNOWN` |
-| Jogos / perfis | Perfil contextual por jogo, caminho autorizado, objetivo, GPU, resolucao/Hz e conflitos de Reflex/VRR/V-Sync/caps/captura; persistencia e importacao | Perfil e dados/recomendacoes; nao altera automaticamente painel de driver, arquivos do jogo ou argumentos do launcher |
-| Steam / Discord / OBS | Versoes por metadados instalados e guias integrais de configuracao | Sem adaptadores de escrita de configuracao, controle de processos, leitura de tokens ou versao da interface presumida |
-| Rede / latencia | Inventario de adaptadores e velocidade de link reportada | Sem ping/jitter/perda/bufferbloat/throughput medidos, troca DNS, MTU, IPv6 ou reset de adaptador |
-| Armazenamento | Discos, espaco livre e metadados; API de confiabilidade somente quando o provedor fornecer | Nao garante SMART completo; sem benchmark de escrita, TRIM forcado ou alteracao de cache |
-| Inicializacao / apps | Nomes de entradas e metadados Steam/Discord/OBS, sem comandos ou usuario | Sem remocao/desativacao de entradas, instalacao/atualizacao via winget ou encerramento de apps |
-| Benchmarks | Importacao de CSV de captura com fonte/hash; FPS medio, 1% low pelo metodo declarado e percentis; comparacao com condicoes/repeticoes verificadas | Sem capturador ETW/PresentMon embutido, injecao, overlay ativo ou medicao de input lag; depende de capturas reais fornecidas |
-| Historico / reversao | Eventos de sessao, diarios duraveis, estados de transacao e restauracao exata pelo executor autorizado | Drivers e guias manuais tem recuperacao separada. Acoes nativas reais continuam bloqueadas por validacao pendente |
-| Relatorios | HTML/JSON/CSV, dados publicos minimizados, pacote privado de reversao, manifesto de hashes e verificacao de exportacao | Pacote privado pode conter identidade/caminhos necessarios a recuperacao; nao e publicacao automatica nem prova de ganho |
-| Documentacao | Busca e leitura de 64 documentos completos, com origem/hash e prompts identificados como referencia | Texto somente leitura; comandos e prompts nao viram instrucoes executaveis |
-| Laboratorio / bloqueios | Consulta dos itens `D_LAB_ONLY` e `X_BLOCKED`, riscos e motivos | Sem executores de BIOS/UEFI, OC/undervolt, HPET/MSI/BCD, DDU automatico, desativacao de seguranca ou remocoes disruptivas |
+| Visão geral | Windows/CPU/GPU/RAM e hipóteses com fonte | Inventário não mede FPS ou input lag |
+| Atendimento | Sessão, objetivo, modo local/remoto, consentimento e retomada | Inventário fica em memória sem autorização de persistência |
+| Catálogo completo | 344 registros, riscos, texto original e associações específicas a executores | Inclusão documental não autoriza comandos; somente executores fixos no código alteram o sistema |
+| Windows / preferências | 16 preferências/políticas de Registro; prévia, aplicação e restauração | Gates de build, edição, elevação, contexto e gerenciamento; no máximo sete ações A por lote |
+| Energia | Planos existentes, GUID ativo, prévia e seleção/reversão | Exige administração e contexto local para mudanças; não cria, exclui ou edita planos |
+| Procedimentos avançados | Guias por capacidade e pré-requisitos; registro explicitamente manual | Não automatiza etapas; confirmação não comprova execução ou ganho |
+| CPU / RAM | Topologia, memória e contadores; seleção de plano no fluxo correspondente | Sem OC, afinidade/prioridade universal ou limpeza de RAM |
+| GPU CENTER | PCI/PnP, driver, OEM, monitores, guias e motores GPU disponíveis | Sem instalação/remoção de driver ou sensores inventados; AdapterRAM não comprova VRAM |
+| Jogos / perfis | Jogo, caminho autorizado, GPU, resolução/Hz e conflitos Reflex/VRR/V-Sync/cap/captura | Hipóteses locais; não escreve perfis privados de driver ou arquivos dos jogos |
+| Steam / Discord / OBS | Instalações detectadas e procedimentos assistidos | Sem adaptadores de escrita ou execução de instaladores |
+| Rede / latência | Adaptadores e velocidade de link reportada | Sem RTT/jitter/perda/bufferbloat medidos ou mudanças DNS/MTU/IPv6 |
+| Armazenamento | Espaço e metadados; confiabilidade quando disponível | Sem garantia de SMART completo, benchmark de escrita ou alteração de cache |
+| Inicialização / apps | Entradas e metadados minimizados | Sem desativação em massa, winget ou encerramento de aplicativos |
+| Benchmarks | CSV, snapshot/hash exato, FPS médio, 1% low, p50/p95/p99 e comparação | Captura externa; sem ETW/injeção/overlay ou inferência de input lag |
+| Histórico / reversão | Eventos, journals e restauração por identidade, alvo e ordem | Drivers e guias manuais têm recuperação separada; divergência externa requer revisão |
+| Relatórios | HTML/JSON/CSV, projeção minimizada e recuperação privada validada | Não publica dados nem comprova ganho; preservar a pasta privada |
+| Documentação | 64 documentos completos, origem/hash e busca | Texto somente leitura, sem avaliar prompts ou comandos |
+| Laboratório / procedimentos | Itens avançados, guias e razões de elegibilidade | Estar no catálogo não cria um executor de OC, BIOS, driver ou segurança |
 
-## Finalizar servico e recuperacao
+## Executores de Registro
 
-O fluxo de finalizacao congela novas operacoes da sessao, verifica transacoes pendentes e exporta relatorio/pacote de reversao com manifesto validado. A finalizacao e idempotente e preserva a recuperacao se a exportacao falhar. Nesta versao o app e portatil; nao ha servico GOAT, agente persistente, desinstalador de terceiros nem limpeza universal do computador. Nenhum reinicio automatico ou apagamento de logs Windows/seguranca/cliente faz parte do fluxo.
+Todos usam alvo fixo, Registry64, snapshot exato, hash, journal anterior à escrita, read-back e rollback. On e Off são escolhas distintas; **Restaurar original** recupera o valor capturado, inclusive ausência. Valores já configurados geram no-op sem nova escrita.
 
-## Cobertura da especificacao
+| ID | Preferência/política | Plataforma e classe |
+| --- | --- | --- |
+| explorer-show-extensions | Mostrar extensões conhecidas | HKCU, Windows 10/11, A |
+| explorer-show-hidden | Mostrar ocultos sem expor arquivos protegidos do sistema | HKCU, Windows 10/11, A |
+| explorer-show-infotips | Dicas textuais | HKCU, Windows 10/11, A |
+| explorer-color-compressed | Cor de arquivos compactados/criptografados | HKCU, Windows 10/11, A |
+| explorer-folder-size-tips | Tamanho nas dicas de pastas | HKCU, Windows 10/11, A |
+| explorer-full-title-path | Caminho no título do Explorer | HKCU, Windows 10/11, A |
+| explorer-separate-process | Preferência de janelas em processo separado | HKCU, Windows 10/11, B individual; console local |
+| ui-transparency | Preferência de transparência | HKCU, Windows 10/11, A |
+| ui-apps-light-theme | Tema claro/escuro de aplicativos compatíveis | HKCU, Windows 10/11, A |
+| ui-system-light-theme | Tema claro/escuro do Windows | HKCU, Windows 10/11, A |
+| ui-titlebar-accent | Destaque em títulos/bordas | HKCU, Windows 10/11, A |
+| ui-auto-accent | Escolha automática da cor | HKCU, Windows 10/11, A |
+| gaming-game-mode | Preferência AutoGameModeEnabled | HKCU, Windows 11, B individual |
+| gaming-controller-gamebar | Atalho do controle para Game Bar | HKCU, Windows 11, B individual |
+| capture-recording-policy | Política AllowGameDVR | HKLM, Windows 10 desktop/build 19041–19045, edição compatível, administrador, B individual; console local e gerenciamento não detectado |
+| explorer-confirm-delete | Confirmação ao enviar arquivos à Lixeira | HKCU, Windows 11, edição compatível, B individual; gerenciamento não detectado |
 
-- **344 IDs de especificacao**, com seus textos integrais, classe, fontes e estado original preservados: 246 do catalogo central + **73** complementos V7.3 + 25 do GPU Center. O texto de abertura dos complementos diz 66, mas seu array possui 73.
-- Os 66 registros de `new_controls` ja estao nos 246 centrais e nao sao somados novamente. IDs diferentes com comportamentos relacionados conservam `related_ids`; a contagem nao equivale a 344 acoes independentes.
-- **41 bloqueios originais** sao preservados, mais nove overrides normativos: **50 bloqueios efetivos**, com motivo/fonte/hash e texto original preservado. Os demais tambem nao ganham permissao de execucao pela importacao.
-- **64 documentos completos** incorporados para consulta. Isso nao transforma exemplos historicos ou pseudocodigo em implementacao.
-- **Duas preferencias nativas** possuem executores originais com preview, journal, read-back e rollback, ainda bloqueados para uso real ate concluir a matriz de validacao. Modo Demo simula sem alterar o Windows.
+**A:** preferência de baixo risco, selecionada e consentida; lote de até sete. **B:** mudança com trade-off, aprovada pelo ID exato e executada sozinha. Máquinas gerenciadas ou edições desconhecidas não passam pelo gate das duas políticas. Windows Server, arquitetura/processo incompatíveis e build desconhecido não passam pelo gate de aplicação real. Esses gates não certificam hardware.
 
-## Modulos ainda ausentes ou nao liberados
+Os alvos do Explorer têm referência em [MS-GPPREF](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-gppref/3c837e92-016e-4148-86e5-b4f0381a757f). A referência de [configurações comuns](https://learn.microsoft.com/en-us/windows/apps/develop/settings/settings-common#personalization---colors) identifica o armazenamento de temas e transparência; a de [Windows 11](https://learn.microsoft.com/en-us/windows/apps/develop/settings/settings-windows-11#gaming-game-bar-game-mode-gaming-shortcuts) identifica as preferências de jogos. Confirmação de exclusão está mapeada em [ADMX_WindowsExplorer](https://learn.microsoft.com/en-us/windows/client-management/mdm/policy-csp-admx-windowsexplorer#confirmfiledelete).
 
-Nao estao implementados como automacao: captura ETW/PresentMon em tempo real, overlay ativo, sensores de temperatura/hotspot/potencia/clocks/VRAM por API validada, medicao fisica de input lag, stress tests, OC/undervolt/firmware, ajustes de seguranca, DDU/instalacao ou remocao de driver, configuracao de paineis NVIDIA/AMD/Intel, adaptadores de escrita Steam/Discord/OBS, descoberta completa de bibliotecas de jogos, alteracao de argumentos de launcher, afinidade/prioridade/leasing de processos, modificacao de inicializacao, ferramentas de rede, winget, RGB e Maker/serial. Os guias e registros correspondentes continuam consultaveis quando presentes na especificacao.
+**Read-back confirma a preferência persistida, não o estado efetivo do recurso.** O Windows pode exigir nova sessão, reabertura ou ter política sobreposta. Nenhum processo é encerrado e nenhum reinício é imposto. A Microsoft limita o efeito documentado de [AllowGameDVR](https://learn.microsoft.com/en-us/windows/client-management/mdm/policy-csp-applicationmanagement#allowgamedvr) ao Windows 10 desktop; no Windows 11 a captura fica assistida. O atalho do controle não equivale a desativar captura.
 
-Nao ha pacote assinado/certificado, compatibilidade universal nem evidencia de ganho de FPS nesta entrega. Testes unitarios de fixtures, smoke de UI/demo e leituras na maquina disponivel cobrem somente os cenarios efetivamente executados. A liberacao de mutacoes exige matriz adicional em Windows 10/11 e sistemas descartaveis; a cobertura fisica NVIDIA/AMD/Intel e os sensores correspondentes devem ser registrada separadamente.
+ui-taskbar-animations-guide é **manual**, inclusive em Demo. A opção é explicada pela [interface de efeitos visuais](https://support.microsoft.com/en-us/accessibility/windows/make-it-easier-to-focus-on-tasks); nenhuma chave privada TaskbarAnimations é escrita como API universal.
 
-## Comandos de verificacao
+## Energia e recuperação
 
-Execute `scripts/Build.ps1` para produzir o aplicativo unico, conforme o README. Os testes ficam em `tests/`; `tests/Test-Inventory.ps1` verifica inventario e integracao GPU sem consultar hardware real. `scripts/Import-Specification.ps1 -SourceRoot <pasta>` reimporta a fonte, confere os 81 hashes do manifesto ativo e regenera os dados de consulta.
+power-select-existing inventaria planos e GUID ativo com powercfg; só ativa um GUID existente após prévia e consentimento. Exige administração e console local para mudanças, informa trade-offs de bateria/calor e verifica o GUID após o comando. Não cria, exclui nem edita planos. Falhas/conflitos preservam o journal; a restauração exige o GUID original existente e estado compatível. Demo não chama powercfg /setactive.
+
+Pendências de Registro e energia impedem novas aplicações no outro motor. Finalização revisa pendências, exporta e valida a recuperação antes de encerrar a sessão. O pacote preserva snapshots originais e usa journals de trabalho separados na recuperação, mantendo a ordem entre sessões. Dados pessoais necessários à recuperação ficam no pacote privado.
+
+## Cobertura e validação
+
+- 344 IDs documentais: 246 centrais + 73 complementos + 25 GPU. Os 66 registros de new_controls já estão nos 246 e não são somados novamente.
+- Estados, motivos e textos originais são preservados como proveniência. Associação a executor cobre somente a operação específica listada; não valida todas as instruções do registro.
+- Os 16 executores passaram por fixtures de aplicação, falha, read-back e restauração. A API real de tipos foi testada somente em HKCU\Software\GOAT-Tweaks-Tests\GUID, chave própria descartável; preferências reais do Windows não foram alteradas nesses testes.
+- Energia usa fixtures de powercfg. A UI usa Demo; inventário real é somente leitura. Isso não equivale a ensaios completos em VM, validação de todos os builds/edições ou cobertura física NVIDIA/AMD/Intel.
+- IMPLEMENTED_AND_TESTED nos executores é acompanhado de ValidationScope. Nenhum ganho de FPS ou estado efetivo é deduzido do sucesso de uma escrita.
+
+Continuam sem executor automático: OC/undervolt/firmware, HPET/MSI/BCD, remoção de driver/DDU, desativação de proteções, stress, ETW/overlay, sensores sem provedor e escrita privada de painéis GPU/Steam/Discord/OBS. Registros e guias continuam consultáveis. O pacote não tem assinatura Authenticode de editor nem certificação universal.
