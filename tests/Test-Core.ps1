@@ -1,394 +1,168 @@
-﻿[CmdletBinding()]
-param()
-
-$ErrorActionPreference = 'Stop'
-. (Join-Path $PSScriptRoot '..\src\Core.ps1')
-$script:GoatNativeOptionsJson=Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\data\native-options.json') -Raw -Encoding UTF8
-$script:OriginalWriteGoatLog = (Get-Item Function:Write-GoatLog).ScriptBlock
-
-# These tests exercise the actual catalog, write-ahead journal, allowlist,
-# transaction engine and recovery. All Windows mutation boundaries are mocked.
-$script:SandboxParent = [IO.Path]::GetFullPath([IO.Path]::GetTempPath())
-$script:Sandbox = Join-Path $script:SandboxParent ('GOAT-CoreTests-' + [Guid]::NewGuid().ToString('N'))
-[IO.Directory]::CreateDirectory($script:Sandbox) | Out-Null
-$script:Passed = 0
-$script:Scan = [pscustomobject]@{ IsDemo=$false; OS=[pscustomobject]@{ Supported=$true;Build=19045 }; Power=[pscustomobject]@{ IsLaptop=$false } }
-
-function Assert-Test {
-    param([bool]$Condition, [string]$Message)
-    if (-not $Condition) { throw "ASSERTION FAILED: $Message" }
-}
-
-function Complete-Test {
-    param([string]$Name)
-    $script:Passed++
-    Write-Output "PASS $Name"
-}
-
-function Get-TestValueKey {
-    param([string]$Path, [string]$Name)
-    return ($Path.ToUpperInvariant() + '|' + $Name.ToUpperInvariant())
-}
-
-function Reset-TestScenario {
-    param([string]$Name)
-    $script:TestRoot = Join-Path $script:Sandbox $Name
-    [IO.Directory]::CreateDirectory($script:TestRoot) | Out-Null
-    $script:Registry = @{}
-    $script:Keys = @{}
-    $script:WriteCount = 0
-    $script:Writes = New-Object 'System.Collections.Generic.List[object]'
-    $script:FailOnWrite = 0
-    $script:CheckpointCalls = 0
-    $script:CheckpointFails = $false
-    $script:MemoryCompression = $false
-    $script:MemoryReadFails = $false
-    $script:MemoryWriteFails = $false
-    $script:FailCommitLog = $false
-    $script:CommitFailureObserved = $false
-    $script:Points = @()
-    $script:MachineGuid = 'TEST-MACHINE-ONE'
-    $script:UserSid = 'S-1-5-21-TEST-ONE'
-    $script:Admin = $true
-    $script:ExpectedOriginals = @{}
-}
-
-function Add-TestRegistryValue {
-    param([string]$Path, [string]$Name, $Value, [string]$Type='DWord')
-    $script:Keys[$Path] = $true
-    $script:Registry[(Get-TestValueKey $Path $Name)] = [pscustomobject]@{ Path=$Path; Name=$Name; Exists=$true; KeyExisted=$true; Value=$Value; Type=$Type }
-}
-
-function Get-TestJournal {
-    $backupRoot = Join-Path $script:TestRoot 'backups'
-    if (-not (Test-Path -LiteralPath $backupRoot)) { return $null }
-    foreach ($file in @(Get-ChildItem -LiteralPath $backupRoot -Filter '*.json' -File | Sort-Object LastWriteTimeUtc -Descending)) {
-        $candidate = Get-Content -LiteralPath $file.FullName -Raw -Encoding UTF8 | ConvertFrom-Json
-        if ($candidate.MachineGuid -eq $script:MachineGuid -and $candidate.UserSid -eq $script:UserSid) { return $candidate }
+﻿#Requires -Version 5.1
+$ErrorActionPreference='Stop'
+. (Join-Path (Split-Path $PSScriptRoot -Parent) 'src\Core.ps1')
+$script:CoreChecks=New-Object 'System.Collections.Generic.List[string]'
+function Assert-Core {param([bool]$Condition,[string]$Name)if(-not $Condition){throw "Core assertion failed: $Name"};$script:CoreChecks.Add($Name)}
+function Assert-CoreThrows {param([scriptblock]$Code,[string]$Name)$failed=$false;try{&$Code|Out-Null}catch{$failed=$true};Assert-Core $failed $Name}
+function Copy-FixtureState {param($Value) $Value|ConvertTo-Json -Depth 32|ConvertFrom-Json}
+$script:FixtureActions=@(Get-GoatActions)
+$script:FixtureRegistry=@{};$script:FixtureWrites=@();$script:FixtureFailure='';$script:FixtureIdentity=[pscustomobject]@{Machine='MACHINE-FIXTURE';Sid='SID-FIXTURE'}
+foreach($action in $script:FixtureActions){$action.ReleaseEnabled=$true;$action.Status='IMPLEMENTED_AND_TESTED'}
+function Get-GoatActions {$script:FixtureActions}
+function Get-GoatIdentity {Copy-FixtureState $script:FixtureIdentity}
+function Read-GoatRegistry {param($Target)if($script:FixtureRegistry.ContainsKey($Target.Id)){Copy-FixtureState $script:FixtureRegistry[$Target.Id]}else{[pscustomobject]@{KeyExists=$true;Exists=$false;Kind=$null;Data=$null}}}
+function Write-GoatRegistry {
+    param($Target,$State)
+    # Verify a durable in-flight journal precedes every mutation, including undo.
+    $journals=@(Get-ChildItem -LiteralPath $script:ActiveSession.Root -Recurse -Filter '*.json'|Where-Object DirectoryName -like '*transactions*'|ForEach-Object{Get-Content -LiteralPath $_.FullName -Raw -Encoding UTF8|ConvertFrom-Json})
+    $recorded=@($journals|ForEach-Object Steps|Where-Object {$_.Id -eq $Target.Id -and $_.State -in @('Applying','Restoring')})
+    if($recorded.Count -eq 0){throw 'No durable journal before fixture write'}
+    $script:FixtureWrites+=($Target.Id+':'+[bool]$State.Exists+':'+[string]$State.Data)
+    if($script:FixtureFailure -eq 'rollback' -and $State.Kind -ne 'DWord'){throw 'Fixture rollback failure'}
+    if($script:FixtureFailure -eq 'partial' -and $Target.Id -eq 'explorer-show-hidden' -and $State.Kind -eq 'DWord'){
+        $script:FixtureRegistry[$Target.Id]=Copy-FixtureState $State
+        $script:FixtureFailure=''
+        throw 'Fixture partial write then throw'
     }
-    return $null
+    $script:FixtureRegistry[$Target.Id]=Copy-FixtureState $State
+    if($script:FixtureFailure -eq 'readback' -and $State.Kind -eq 'DWord'){$script:FixtureRegistry[$Target.Id].Data=99;$script:FixtureFailure=''}
+    if($script:FixtureFailure -eq 'rollback' -and $State.Kind -eq 'DWord'){$script:FixtureRegistry[$Target.Id].Data=99}
 }
-
-function Test-GoatAdministrator { return $script:Admin }
-function Get-GoatStorageRoot { return $script:TestRoot }
-function Get-GoatMachineIdentity { return [pscustomobject]@{ MachineGuid=$script:MachineGuid; UserSid=$script:UserSid } }
-function Get-GoatActivePowerScheme { return '381b4222-f694-41f0-9685-ff5bb260df2e' }
-function Get-GoatTcpAutoTuning { return 'restricted' }
-function Get-NetOffloadGlobalSetting { param($ErrorAction) return [pscustomobject]@{ ReceiveSideScaling='Disabled' } }
-function Invoke-GoatNative {
-    param($File, $Arguments)
-    if (($Arguments -join ' ') -eq '/list') { return '8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c' }
-    throw 'TEST GUARD: native mutation must never be invoked.'
-}
-function Set-NetTCPSetting { throw 'TEST GUARD: TCP mutation must never be invoked.' }
-function Get-MMAgent {
-    if ($script:MemoryReadFails) { throw 'SIMULATED: unavailable MMAgent' }
-    return [pscustomobject]@{MemoryCompression=$script:MemoryCompression}
-}
-function Set-TestMemoryCompression {
-    param([bool]$Enabled)
-    $journal=Get-TestJournal
-    Assert-Test ($journal.RestorePoint -eq 123) 'Memory compression write must have verified protection.'
-    Assert-Test ($journal.Steps[0].Original -is [bool]) 'Original Boolean memory state must be persisted before writing.'
-    Assert-Test ($journal.Steps[0].Status -in @('Applying','Applied','Restoring')) 'Memory step intent must precede writing.'
-    $script:WriteCount++
-    $script:MemoryCompression=$Enabled
-    if ($script:MemoryWriteFails) { $script:MemoryWriteFails=$false; throw 'SIMULATED: MMAgent failed after writing' }
-}
-function Enable-MMAgent { param([switch]$MemoryCompression) Set-TestMemoryCompression $true }
-function Disable-MMAgent { param([switch]$MemoryCompression) Set-TestMemoryCompression $false }
-function Set-NetOffloadGlobalSetting { throw 'TEST GUARD: offload mutation must never be invoked.' }
-function Checkpoint-Computer { throw 'TEST GUARD: real checkpoint API must never be invoked.' }
-function Write-GoatLog {
-    param([string]$Path, [string]$Message, [string]$Level='INFO')
-    if ($script:FailCommitLog -and $Message.StartsWith('COMMIT -')) {
-        Assert-Test ((Get-TestJournal).Status -eq 'Applied') 'The commit log regression must fail after the Applied journal was persisted.'
-        $script:CommitFailureObserved = $true
-        $script:FailCommitLog = $false
-        throw 'SIMULATED: final COMMIT log write failed'
-    }
-    & $script:OriginalWriteGoatLog $Path $Message $Level
-}
-function New-GoatRestorePoint {
-    param($TransactionId, $LogPath)
-    $script:CheckpointCalls++
-    if ($script:CheckpointFails) { throw 'SIMULATED: restore point unavailable' }
-    $script:Points = @([pscustomobject]@{ SequenceNumber=123; Description="GOAT v2.2 $TransactionId" })
-    return 123
-}
-function Get-CimInstance {
-    param($Namespace,$ClassName,$OperationTimeoutSec,$ErrorAction)
-    if ($ClassName -ne 'SystemRestore' -or $Namespace -ne 'root/default') { throw 'Unexpected CIM query in transaction tests.' }
-    return $script:Points
-}
-function Get-GoatRegistryState {
-    param([string]$Path, [string]$Name)
-    $id = Get-TestValueKey $Path $Name
-    if ($script:Registry.ContainsKey($id)) {
-        $value = $script:Registry[$id]
-        return [pscustomobject]@{ Path=$Path; Name=$Name; Exists=$true; KeyExisted=$true; Value=$value.Value; Type=$value.Type }
-    }
-    return [pscustomobject]@{ Path=$Path; Name=$Name; Exists=$false; KeyExisted=$script:Keys.ContainsKey($Path); Value=$null; Type='DWord' }
-}
-function Set-GoatRegistryState {
-    param($State)
-    $script:WriteCount++
-    $journal = Get-TestJournal
-    Assert-Test ($null -ne $journal) 'Durable backup must exist before every write.'
-    Assert-Test ($journal.RestorePoint -eq 123) 'A confirmed restore point must precede writes.'
-    Assert-Test ($journal.Status -in @('Applying','Applied','Restoring')) 'Journal must identify a protected apply or restore, including rollback after commit-log failure.'
-    $pending = @($journal.Steps | Where-Object { $_.Original.Path -eq $State.Path -and $_.Original.Name -eq $State.Name })
-    Assert-Test ($pending.Count -eq 1) 'Every write must have exactly one captured original.'
-    Assert-Test ($pending[0].Status -in @('Applying','Applied','Restoring')) 'Step intent must be durable before the write.'
-    foreach ($expectedId in $script:ExpectedOriginals.Keys) {
-        $original = $script:ExpectedOriginals[$expectedId]
-        $persisted = @($journal.Steps | Where-Object { $_.Original.Path -eq $original.Path -and $_.Original.Name -eq $original.Name })
-        Assert-Test ($persisted.Count -eq 1) 'ALL originals must be captured before the first write.'
-        Assert-Test ((ConvertTo-Json -InputObject $persisted[0].Original -Compress) -eq (ConvertTo-Json -InputObject $original -Compress)) 'Persisted original value/type/existence must match the pre-apply snapshot.'
-    }
-    $id = Get-TestValueKey $State.Path $State.Name
-    $script:Writes.Add([pscustomobject]@{ Name=$State.Name; Value=$State.Value; Exists=$State.Exists; Type=$State.Type })
-    if ($State.Exists) {
-        $script:Keys[$State.Path] = $true
-        $script:Registry[$id] = [pscustomobject]@{ Path=$State.Path; Name=$State.Name; Exists=$true; KeyExisted=$true; Value=$State.Value; Type=$State.Type }
-    }
-    else {
-        $script:Registry.Remove($id)
-        $remaining = @($script:Registry.Values | Where-Object { $_.Path -eq $State.Path })
-        if (-not $State.KeyExisted -and $remaining.Count -eq 0) { $script:Keys.Remove($State.Path) }
-    }
-    # Fail after the simulated write to ensure the engine recovers in-flight
-    # mutations, rather than only writes known to have completed successfully.
-    if ($script:FailOnWrite -gt 0 -and $script:WriteCount -eq $script:FailOnWrite) { throw 'SIMULATED: mutation failed after touching value' }
-}
-
-function Save-TestExpectedOriginals {
-    param([string[]]$Ids)
-    foreach ($tweak in @(Get-GoatTweaks -Scan $script:Scan | Where-Object { $_.Id -in $Ids })) {
-        foreach ($target in $tweak.Targets) {
-            $original = Get-GoatRegistryState $target.Path $target.Name
-            $script:ExpectedOriginals[(Get-TestValueKey $target.Path $target.Name)] = $original
-        }
-    }
-}
-
-function Assert-TestOriginalsRestored {
-    foreach ($original in $script:ExpectedOriginals.Values) {
-        $actual = Get-GoatRegistryState $original.Path $original.Name
-        Assert-Test ((ConvertTo-Json -InputObject $actual -Compress) -eq (ConvertTo-Json -InputObject $original -Compress)) ('Original configuration was not restored: ' + $original.Name)
-    }
-}
-
+$root=Join-Path ([IO.Path]::GetTempPath()) ('GOAT-Core-Test-'+[guid]::NewGuid().ToString('N'))
+[void][IO.Directory]::CreateDirectory($root)
 try {
-    Reset-TestScenario 'demo'
-    $result = Invoke-GoatApply -Ids @('game-mode') -Scan $script:Scan -Demo
-    $undo = Restore-GoatLastTransaction -Demo
-    Assert-Test ($result.Success -and $undo.Success) 'Demo apply and restore should succeed.'
-    Assert-Test ($script:WriteCount -eq 0 -and $script:CheckpointCalls -eq 0) 'Demo must not mutate settings or create checkpoints.'
-    Assert-Test (@(Get-ChildItem -LiteralPath $script:TestRoot -Recurse -File).Count -eq 0) 'Demo must not create backups or logs.'
-    Complete-Test 'Demo performs no writes or checkpoint calls'
+    $script:ActiveSession=New-GoatSession -Root $root
+    $session=$script:ActiveSession
+    Assert-Core ([IO.File]::Exists((Join-Path $session.Root 'session.json'))) 'session saved with unique ownership'
+    $session.Inventory=[pscustomobject]@{PrivateFixture='DO-NOT-PERSIST'};Save-GoatSession $session
+    $storedSession=Get-Content -LiteralPath (Join-Path $session.Root 'session.json') -Raw -Encoding UTF8|ConvertFrom-Json
+    Assert-Core ($null -eq $storedSession.Inventory -and $session.Inventory.PrivateFixture -eq 'DO-NOT-PERSIST') 'inventory stays in UI memory without persistence consent'
+    $session.Consent=$true;Save-GoatSession $session
+    $storedSession=Get-Content -LiteralPath (Join-Path $session.Root 'session.json') -Raw -Encoding UTF8|ConvertFrom-Json
+    Assert-Core ($storedSession.Inventory.PrivateFixture -eq 'DO-NOT-PERSIST') 'inventory persisted only with explicit boolean consent'
+    $loaded=Import-GoatSession -Path (Join-Path $session.Root 'session.json') -Demo:$false
+    Assert-Core ($loaded.Id -eq $session.Id -and $loaded.Root -eq $session.Root) 'session loader validates and canonicalizes the actual session directory'
+    Assert-CoreThrows {Import-GoatSession -Path (Join-Path $session.Root 'session.json') -Demo} 'session loader cannot silently convert real session to Demo'
+    $storedSession.Consent=$false;Write-GoatJson $storedSession (Join-Path $session.Root 'session.json')
+    $loaded=Import-GoatSession -Path (Join-Path $session.Root 'session.json')
+    Assert-Core ($null -eq $loaded.Inventory -and $loaded.RuntimeWarnings.Count -gt 0) 'loader discards legacy inventory stored without consent'
+    $storedSession.State='Finalizing';$storedSession.FinalExport=$null;Write-GoatJson $storedSession (Join-Path $session.Root 'session.json')
+    $loaded=Import-GoatSession -Path (Join-Path $session.Root 'session.json')
+    Assert-Core ($loaded.State -eq 'Open' -and $loaded.RuntimeWarnings.Count -gt 0) 'interrupted finalization without valid export reopens for review'
+    $storedSession.State='ExecuteAnything';Write-GoatJson $storedSession (Join-Path $session.Root 'session.json')
+    Assert-CoreThrows {Import-GoatSession -Path (Join-Path $session.Root 'session.json')} 'session loader rejects unknown state'
+    Save-GoatSession $session
+    $preview=@(Get-GoatActionPreview -Session $session -Ids explorer-show-extensions)
+    Assert-Core ($preview.Count -eq 1 -and $preview[0].Changed -and -not $preview[0].Before.Exists -and $preview[0].Proposed.Data -eq 0) 'preview preserves absence and shows proposed DWORD'
+    Assert-Core ($script:FixtureWrites.Count -eq 0) 'preview has no registry writes'
+    Assert-CoreThrows {Invoke-GoatActionBatch -Session $session -Ids explorer-show-extensions} 'batch requires consent'
+    Assert-CoreThrows {Get-GoatActionPreview $session @('explorer-show-extensions','explorer-show-extensions')} 'duplicate action rejected'
+    Assert-CoreThrows {Get-GoatActionPreview $session @('not-real')} 'unknown action rejected'
+    $script:FixtureActions[0].Status='SPEC_ONLY_NOT_YET_VERIFIED'
+    Assert-CoreThrows {Invoke-GoatActionBatch -Session $session -Ids explorer-show-extensions -Consent} 'spec status cannot execute even with release flag'
+    $script:FixtureActions[0].Status='IMPLEMENTED_AND_TESTED';$script:FixtureActions[0].ReleaseEnabled=$false
+    Assert-CoreThrows {Invoke-GoatActionBatch -Session $session -Ids explorer-show-extensions -Consent} 'release flag independently gates mutation'
+    $script:FixtureActions[0].ReleaseEnabled=$true
+    $transaction=Invoke-GoatActionBatch -Session $session -Ids explorer-show-extensions -Consent
+    $disk=@(Get-GoatTransactions $session)[0]
+    Assert-Core ($transaction.State -eq 'Applied' -and $disk.State -eq 'Applied' -and $disk.Steps[0].State -eq 'Applied') 'batch durable and verified'
+    Assert-Core (-not $disk.Steps[0].Original.Exists -and $disk.Steps[0].Target.Hive -eq 'CurrentUser' -and $disk.Steps[0].Target.View -eq 'Registry64') 'snapshot preserves hive view and absence'
+    Assert-Core ($disk.Steps[0].SnapshotSha256 -eq (Get-GoatSnapshotHash $disk.Steps[0])) 'exact snapshot hash persists and verifies'
+    $altered=Copy-FixtureState $disk;$altered.Steps[0].Original.Exists=$true;$altered.Steps[0].Original.Kind='String';$altered.Steps[0].Original.Data='ALTERED'
+    Assert-CoreThrows {Assert-GoatTransaction $altered $script:FixtureIdentity} 'modified original data cannot pass snapshot integrity'
+    $altered=Copy-FixtureState $disk;$altered.Steps[0].State='EXECUTE_SCRIPT'
+    Assert-CoreThrows {Assert-GoatTransaction $altered $script:FixtureIdentity} 'unknown journal step cannot skip recovery with false restored state'
+    $altered=Copy-FixtureState $disk;$altered.Steps[0].Original.Exists='false'
+    Assert-CoreThrows {Assert-GoatTransaction $altered $script:FixtureIdentity} 'presence flag string cannot masquerade as snapshot boolean'
+    Assert-CoreThrows {Restore-GoatTransaction $session $transaction.Id} 'restore requires consent'
+    Restore-GoatTransaction $session $transaction.Id -Consent|Out-Null
+    Assert-Core (-not (Read-GoatRegistry $script:FixtureActions[0]).Exists) 'restore original absence does not set opposite preference'
+    $writeCount=$script:FixtureWrites.Count
+    Restore-GoatTransaction $session $transaction.Id -Consent|Out-Null
+    Assert-Core ($script:FixtureWrites.Count -eq $writeCount) 'restoration idempotent'
+    $configured=[pscustomobject]@{KeyExists=$true;Exists=$true;Kind='DWord';Data=0};$script:FixtureRegistry['explorer-show-extensions']=Copy-FixtureState $configured
+    $writeCount=$script:FixtureWrites.Count;$unchanged=Invoke-GoatActionBatch -Session $session -Ids explorer-show-extensions -Consent
+    Assert-Core ($unchanged.Steps[0].State -eq 'Unchanged' -and $script:FixtureWrites.Count -eq $writeCount) 'already configured preference records no-op without a registry write'
+    Restore-GoatTransaction $session $unchanged.Id -Consent|Out-Null
+    Assert-Core ($script:FixtureWrites.Count -eq $writeCount) 'restoring no-op never overwrites the unchanged original'
+    $drift=Invoke-GoatActionBatch -Session $session -Ids explorer-show-extensions -Direction Off -Consent
+    $script:FixtureRegistry['explorer-show-extensions'].Data=99;$writeCount=$script:FixtureWrites.Count
+    Assert-CoreThrows {Restore-GoatTransaction $session $drift.Id -Consent} 'external state drift requires review before explicit restoration'
+    Assert-Core ($script:FixtureWrites.Count -eq $writeCount) 'drifted value is preserved rather than overwritten'
+    $script:FixtureRegistry['explorer-show-extensions'].Data=1;Restore-GoatTransaction $session $drift.Id -Consent|Out-Null
 
-    Reset-TestScenario 'checkpoint-failure'
-    Save-TestExpectedOriginals @('game-mode')
-    $script:CheckpointFails = $true
-    $result = Invoke-GoatApply -Ids @('game-mode') -Scan $script:Scan
-    Assert-Test (-not $result.Success) 'Failed protection must abort apply.'
-    Assert-Test ($script:WriteCount -eq 0 -and $script:CheckpointCalls -eq 1) 'No mutation may follow checkpoint failure.'
-    $journal = Get-TestJournal
-    Assert-Test ($journal.Status -eq 'Failed' -and $journal.Steps.Count -eq 2) 'Failed checkpoint must leave an intact original-state journal.'
-    Complete-Test 'Failed checkpoint blocks changes after persisting originals'
-
-    Reset-TestScenario 'rollback'
-    Add-TestRegistryValue 'HKCU:\Software\Microsoft\GameBar' 'AutoGameModeEnabled' 0
-    Save-TestExpectedOriginals @('game-mode')
-    $script:FailOnWrite = 2
-    $result = Invoke-GoatApply -Ids @('game-mode') -Scan $script:Scan
-    Assert-Test (-not $result.Success) 'Injected partial failure must fail the transaction.'
-    Assert-Test ($script:WriteCount -eq 4) 'Both the applied and in-flight values must be rolled back.'
-    Assert-Test ($script:Writes[2].Name -eq 'AllowAutoGameMode' -and $script:Writes[3].Name -eq 'AutoGameModeEnabled') 'Rollback order must reverse mutation order.'
-    Assert-Test ((Get-TestJournal).Status -eq 'Failed') 'A fully rolled back transaction must be marked Failed.'
-    Assert-TestOriginalsRestored
-    Complete-Test 'Partial failure restores applied and in-flight values in reverse order'
-
-    Reset-TestScenario 'successful-restore'
-    Add-TestRegistryValue 'HKCU:\Software\Microsoft\GameBar' 'AutoGameModeEnabled' 0
-    Add-TestRegistryValue 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects' 'VisualFXSetting' 1
-    Add-TestRegistryValue 'HKCU:\Control Panel\Desktop\WindowMetrics' 'MinAnimate' '1' 'String'
-    Save-TestExpectedOriginals @('game-mode','visual-effects')
-    $result = Invoke-GoatApply -Ids @('game-mode','visual-effects') -Scan $script:Scan
-    Assert-Test ($result.Success -and $script:WriteCount -eq 5) 'Five registry writes should be verified and committed.'
-    Assert-Test ((Get-TestJournal).Status -eq 'Applied') 'Successful transaction must be committed.'
-    $undo = Restore-GoatLastTransaction
-    Assert-Test ($undo.Success) ('Restore failed: ' + $undo.Message)
-    Assert-Test ($script:WriteCount -eq 10 -and $script:CheckpointCalls -eq 1) 'Restore must use original captured state and reuse its confirmed restore point.'
-    Assert-Test ((Get-TestJournal).Status -eq 'Restored') 'Successful undo must be committed.'
-    Assert-TestOriginalsRestored
-    Complete-Test 'Apply and undo preserve DWORD/String types, missing values and key existence'
-
-    Reset-TestScenario 'interrupted'
-    Save-TestExpectedOriginals @('game-mode')
-    $result = Invoke-GoatApply -Ids @('game-mode') -Scan $script:Scan
-    Assert-Test ($result.Success) 'Fixture apply failed.'
-    $journal = Get-TestJournal
-    $journal.Status = 'Applying'
-    $journal.Steps[1].Status = 'Applying'
-    $journalPath = Join-Path $script:TestRoot ('backups\' + $journal.Id + '.json')
-    Write-GoatJournal $journal $journalPath
-    $blocked = Invoke-GoatApply -Ids @('visual-effects') -Scan $script:Scan
-    Assert-Test (-not $blocked.Success -and $script:WriteCount -eq 2) 'A pending journal must block another apply batch.'
-    $script:Points = @()
-    $undo = Restore-GoatLastTransaction
-    Assert-Test ($undo.Success -and $script:CheckpointCalls -eq 2) 'Interrupted recovery must create protection if the original point is gone.'
-    Assert-TestOriginalsRestored
-    Complete-Test 'Interrupted write is recoverable and blocks overlapping batches'
-
-    Reset-TestScenario 'wrong-machine'
-    $result = Invoke-GoatApply -Ids @('game-mode') -Scan $script:Scan
-    Assert-Test ($result.Success) 'Fixture apply failed.'
-    $script:MachineGuid = 'OTHER-WINDOWS'
-    $undo = Restore-GoatLastTransaction
-    Assert-Test (-not $undo.Success -and $script:WriteCount -eq 2) 'Foreign machine journal must be rejected without writes.'
-    $script:MachineGuid = 'TEST-MACHINE-ONE'; $script:UserSid = 'S-1-5-21-OTHER-USER'
-    $undo = Restore-GoatLastTransaction
-    Assert-Test (-not $undo.Success -and $script:WriteCount -eq 2) 'Foreign user journal must be rejected without writes.'
-    Complete-Test 'Machine and user identity are checked before restore'
-
-    Reset-TestScenario 'commit-log-failure'
-    Add-TestRegistryValue 'HKCU:\Software\Microsoft\GameBar' 'AutoGameModeEnabled' 0
-    Save-TestExpectedOriginals @('game-mode')
-    $script:FailCommitLog = $true
-    $result = Invoke-GoatApply -Ids @('game-mode') -Scan $script:Scan
-    Assert-Test ($script:CommitFailureObserved -and -not $result.Success) 'Final COMMIT logging failure must return failure after commit was attempted.'
-    Assert-Test ($script:WriteCount -eq 4) 'Commit logging failure must roll back both completed changes.'
-    $journal = Get-TestJournal
-    Assert-Test ($journal.Status -eq 'Failed') 'Commit logging failure must leave a Failed journal after complete rollback.'
-    Assert-Test (@($journal.Steps | Where-Object { $_.Status -ne 'RolledBack' }).Count -eq 0) 'No applied step may be hidden in the failed transaction.'
-    Assert-TestOriginalsRestored
-    Complete-Test 'Final COMMIT logging failure rolls back already committed changes'
-
-    Reset-TestScenario 'unsupported-original-kind'
-    Add-TestRegistryValue 'HKCU:\Software\Microsoft\GameBar' 'AutoGameModeEnabled' 7 'None'
-    Save-TestExpectedOriginals @('game-mode')
-    $result = Invoke-GoatApply -Ids @('game-mode') -Scan $script:Scan
-    Assert-Test (-not $result.Success) 'An unsupported original RegistryValueKind must be rejected.'
-    Assert-Test ($script:WriteCount -eq 0 -and $script:CheckpointCalls -eq 0) 'Unsupported original types must stop the batch before any mutation or checkpoint call.'
-    Assert-TestOriginalsRestored
-    Complete-Test 'Unsupported original registry types prevent all writes'
-
-    Reset-TestScenario 'mixed-identities'
-    Save-TestExpectedOriginals @('game-mode')
-    $result = Invoke-GoatApply -Ids @('game-mode') -Scan $script:Scan
-    Assert-Test ($result.Success) 'Fixture apply failed.'
-    $ownJournal = Get-TestJournal
-    $foreignJournal = $ownJournal | ConvertTo-Json -Depth 16 | ConvertFrom-Json
-    $foreignJournal.Id = '99999999-foreign-user'
-    $foreignJournal.UserSid = 'S-1-5-21-FOREIGN-USER'
-    $foreignPath = Join-Path $script:TestRoot 'backups\99999999-foreign-user.json'
-    Write-GoatJournal $foreignJournal $foreignPath
-    $undo = Restore-GoatLastTransaction
-    Assert-Test ($undo.Success -and $undo.TransactionId -eq $ownJournal.Id) 'Restore must skip a newer foreign-user journal and restore the latest current-user transaction.'
-    Assert-Test ($script:WriteCount -eq 4) 'Only the current-user transaction may be undone.'
-    Assert-Test ((Get-TestJournal).Status -eq 'Restored') 'The current-user journal must be marked restored.'
-    $foreignAfter = Get-Content -LiteralPath $foreignPath -Raw -Encoding UTF8 | ConvertFrom-Json
-    Assert-Test ($foreignAfter.Status -eq 'Applied' -and $foreignAfter.UserSid -eq 'S-1-5-21-FOREIGN-USER') 'Foreign-user journal must remain unchanged.'
-    Assert-TestOriginalsRestored
-    Complete-Test 'Newer foreign-user journal is skipped in favor of the current user'
-
-    Reset-TestScenario 'unknown-id'
-    $result = Invoke-GoatApply -Ids @('not-a-real-tweak') -Scan $script:Scan
-    Assert-Test (-not $result.Success -and $script:WriteCount -eq 0 -and $script:CheckpointCalls -eq 0) 'Unknown tweak must fail before protection or mutations.'
-    Complete-Test 'Unknown IDs are rejected'
-
-    Reset-TestScenario 'no-admin'
-    $script:Admin = $false
-    $result = Invoke-GoatApply -Ids @('game-mode') -Scan $script:Scan
-    $undo = Restore-GoatLastTransaction
-    Assert-Test (-not $result.Success -and -not $undo.Success -and $script:WriteCount -eq 0) 'Apply and restore require administrator access.'
-    Complete-Test 'Administrator guard applies to mutation and recovery'
-
-    Reset-TestScenario 'memory-compression-restore'
-    $result=Invoke-GoatApply -Ids @('memory-compression') -Scan $script:Scan
-    Assert-Test ($result.Success -and $script:MemoryCompression) 'Compression must enable through protected transaction.'
-    Assert-Test ((Get-TestJournal).Steps[0].Original -eq $false) 'Disabled original must be saved as Boolean false.'
-    $undo=Restore-GoatLastTransaction
-    Assert-Test ($undo.Success -and -not $script:MemoryCompression -and $script:WriteCount -eq 2) 'Undo must restore original compression state.'
-    Complete-Test 'Memory compression apply and undo preserve original Boolean state'
-
-    Reset-TestScenario 'memory-compression-partial-failure'
-    $script:MemoryWriteFails=$true
-    $result=Invoke-GoatApply -Ids @('memory-compression') -Scan $script:Scan
-    Assert-Test (-not $result.Success -and -not $script:MemoryCompression -and $script:WriteCount -eq 2) 'Partial compression write must roll back its original state.'
-    Complete-Test 'Memory compression partial failure rolls back in-flight change'
-
-    Reset-TestScenario 'memory-compression-unavailable'
-    $script:MemoryReadFails=$true
-    $result=Invoke-GoatApply -Ids @('memory-compression') -Scan $script:Scan
-    Assert-Test (-not $result.Success -and $script:WriteCount -eq 0 -and $script:CheckpointCalls -eq 0) 'Unknown compression state must block mutation.'
-    Complete-Test 'Unknown memory compression state blocks apply'
-
-    Reset-TestScenario 'demo-advanced-state'
-    $demoScan=[pscustomobject]@{IsDemo=$true;OS=[pscustomobject]@{Supported=$true};AdvancedState=[pscustomobject]@{Readings=@{
-        'memory-compression'=[pscustomobject]@{Available=$true;Value=$false}
-        'network-autotuning'=[pscustomobject]@{Available=$true;Value='normal'}
-        'rss'=[pscustomobject]@{Available=$true;Value='Enabled'}
-    }}}
-    foreach ($snapshot in @($demoScan,($demoScan|ConvertTo-Json -Depth 8|ConvertFrom-Json))) {
-        $demoTweaks=@(Get-GoatTweaks -Scan $snapshot)
-        $memory=@($demoTweaks|Where-Object Id -eq 'memory-compression')[0]
-        Assert-Test ($memory.Available -and $memory.Recommended) 'Demo compression false must remain available before and after JSON conversion.'
-        Assert-Test (@($demoTweaks|Where-Object {$_.Id -in @('tcp-normal','rss-on') -and $_.State -eq 'Aplicado'}).Count -eq 2) 'Demo TCP and RSS must agree with the configured advanced snapshot.'
+    foreach($fixture in @(@('String','original'),@('ExpandString','%USERPROFILE%\fixture'),@('MultiString',@('a','b')),@('Binary',@([byte]0,[byte]255)),@('QWord',[long]4294967296),@('DWord',-2147483648))) {
+        $original=[pscustomobject]@{KeyExists=$true;Exists=$true;Kind=$fixture[0];Data=$fixture[1]}
+        $script:FixtureRegistry['explorer-show-extensions']=Copy-FixtureState $original
+        $tx=Invoke-GoatActionBatch -Session $session -Ids explorer-show-extensions -Consent
+        Restore-GoatTransaction $session $tx.Id -Consent|Out-Null
+        Assert-Core (Test-GoatStateEqual (Read-GoatRegistry $script:FixtureActions[0]) $original) ('exact original kind and data '+$fixture[0])
     }
-    Assert-Test ($script:WriteCount -eq 0) 'Demo catalog cannot write Windows state.'
-    Complete-Test 'Demo recommendations and native states agree across JSON round-trip'
+    $beforeA=[pscustomobject]@{KeyExists=$true;Exists=$true;Kind='String';Data='before-a'}
+    $beforeB=[pscustomobject]@{KeyExists=$true;Exists=$true;Kind='String';Data='before-b'}
+    $script:FixtureRegistry['explorer-show-extensions']=Copy-FixtureState $beforeA;$script:FixtureRegistry['explorer-show-hidden']=Copy-FixtureState $beforeB
+    $script:FixtureFailure='partial';$script:FixtureWrites=@()
+    Assert-CoreThrows {Invoke-GoatActionBatch -Session $session -Ids @('explorer-show-extensions','explorer-show-hidden') -Consent} 'partial write failure surfaces'
+    Assert-Core ((Test-GoatStateEqual (Read-GoatRegistry $script:FixtureActions[0]) $beforeA) -and (Test-GoatStateEqual (Read-GoatRegistry $script:FixtureActions[1]) $beforeB)) 'partially written in-flight step and prior step restored'
+    Assert-Core ($script:FixtureWrites[-2] -like 'explorer-show-hidden*' -and $script:FixtureWrites[-1] -like 'explorer-show-extensions*') 'rollback reverses dependency order'
+    $script:FixtureFailure='readback'
+    Assert-CoreThrows {Invoke-GoatActionBatch -Session $session -Ids explorer-show-extensions -Consent} 'readback mismatch fails batch'
+    Assert-Core (Test-GoatStateEqual (Read-GoatRegistry $script:FixtureActions[0]) $beforeA) 'readback failure restored original'
+    $script:FixtureFailure='rollback'
+    Assert-CoreThrows {Invoke-GoatActionBatch -Session $session -Ids explorer-show-extensions -Consent} 'rollback failure surfaces'
+    $failed=@(Get-GoatTransactions $session|Where-Object State -eq RestoreFailed)[0]
+    Assert-Core ($failed.Steps[0].Original.Data -eq 'before-a' -and [IO.File]::Exists($failed.JournalPath)) 'failed rollback preserves original journal'
+    Assert-CoreThrows {Invoke-GoatActionBatch -Session $session -Ids explorer-show-hidden -Consent} 'pending recovery blocks new mutation'
+    $other=New-GoatSession -Root $root
+    Assert-CoreThrows {Invoke-GoatActionBatch -Session $other -Ids explorer-show-hidden -Consent} 'pending journal in earlier session blocks new session'
+    $script:FixtureFailure=''
+    Restore-GoatTransaction $session $failed.Id -Consent|Out-Null
+    Assert-Core (Test-GoatStateEqual (Read-GoatRegistry $script:FixtureActions[0]) $beforeA) 'retry completes failed rollback'
 
-    Reset-TestScenario 'disable-configured-memory'
-    $script:MemoryCompression=$true
-    $result=Invoke-GoatApply -Ids @('memory-compression') -Scan $script:Scan -Directions @{'memory-compression'='Off'}
-    Assert-Test ($result.Success -and -not $script:MemoryCompression) 'Explicit Off must disable a currently enabled compression state.'
-    $undo=Restore-GoatLastTransaction
-    Assert-Test ($undo.Success -and $script:MemoryCompression) 'Undo Off must restore the true original.'
-    Complete-Test 'Explicit Off applies and restores an already configured native option'
-
-    Reset-TestScenario 'native-option-on-off-undo'
-    $native=@(Get-GoatTweaks -Scan $script:Scan | Where-Object Id -eq 'file-extensions')[0]
-    Assert-Test ($native.CanDisable -and $native.Available) 'Reviewed native file option must expose both states.'
-    $result=Invoke-GoatApply -Ids @('file-extensions') -Scan $script:Scan -Directions @{'file-extensions'='On'}
-    Assert-Test ($result.Success) 'New native On must commit.'
-    $result=Invoke-GoatApply -Ids @('file-extensions') -Scan $script:Scan -Directions @{'file-extensions'='Off'}
-    Assert-Test ($result.Success) 'New native Off must commit.'
-    $undo=Restore-GoatLastTransaction
-    Assert-Test ($undo.Success -and (Test-GoatRegistryTargetsMatch $native.Targets)) 'Undo restores the state before Off, not guessed defaults.'
-    Complete-Test 'Reviewed native option toggles both directions and restores prior state'
-
-    Reset-TestScenario 'invalid-directions'
-    $result=Invoke-GoatApply -Ids @('memory-compression') -Scan $script:Scan -Directions @{'memory-compression'='Maybe'}
-    $unavailable=Invoke-GoatApply -Ids @('tcp-normal') -Scan $script:Scan -Directions @{'tcp-normal'='Off'}
-    Assert-Test (-not $result.Success -and -not $unavailable.Success -and $script:WriteCount -eq 0 -and $script:CheckpointCalls -eq 0) 'Unknown and unsupported directions must fail before checkpoint or mutation.'
-    Complete-Test 'Unreviewed directions are rejected before mutation'
-
-    Reset-TestScenario 'restore-chronology'
-    $result=Invoke-GoatApply -Ids @('file-extensions') -Scan $script:Scan
-    Assert-Test ($result.Success) 'Chronology fixture must apply.'
-    $older=Get-TestJournal
-    $older.CreatedUtc='2026-10-26T12:00:00.1000000Z'
-    Write-GoatJournal $older (Join-Path $script:TestRoot ('backups\'+$older.Id+'.json'))
-    $newer=$older|ConvertTo-Json -Depth 16|ConvertFrom-Json
-    $newer.Id='00000000-newer'
-    $newer.CreatedUtc='2026-10-26T12:00:00.9000000Z'
-    Write-GoatJournal $newer (Join-Path $script:TestRoot 'backups\00000000-newer.json')
-    $undo=Restore-GoatLastTransaction
-    Assert-Test ($undo.Success -and $undo.TransactionId -eq '00000000-newer') 'Restore must use newest captured timestamp even when filename sorts first and both entries share a second.'
-    Complete-Test 'Restore orders transactions by captured timestamp rather than random filename suffix'
-
-    Write-Output "PASS: $script:Passed transaction tests; no Windows settings were changed."
+    $tx1=Invoke-GoatActionBatch -Session $session -Ids explorer-show-extensions -Consent
+    $tx2=Invoke-GoatActionBatch -Session $session -Ids explorer-show-hidden -Consent
+    Assert-CoreThrows {Restore-GoatTransaction $session $tx1.Id -Consent} 'older transaction cannot override newer batch'
+    $stored=@(Get-GoatTransactions $session|Where-Object Id -eq $tx2.Id)[0]
+    $originalTarget=$stored.Steps[0].Target.Path;$stored.Steps[0].Target.Path='Software\WrongTarget'
+    Write-GoatJson $stored $stored.JournalPath
+    $beforeWrites=$script:FixtureWrites.Count
+    Assert-CoreThrows {Restore-GoatTransaction $session $tx2.Id -Consent} 'tampered journal target rejected'
+    Assert-Core ($script:FixtureWrites.Count -eq $beforeWrites) 'tampered target causes no write'
+    $stored.Steps[0].Target.Path=$originalTarget;Write-GoatJson $stored $stored.JournalPath
+    $script:FixtureIdentity.Sid='OTHER-SID'
+    Assert-CoreThrows {Restore-GoatTransaction $session $tx2.Id -Consent} 'wrong user identity rejected'
+    $script:FixtureIdentity.Sid='SID-FIXTURE';$script:FixtureIdentity.Machine='OTHER-MACHINE'
+    Assert-CoreThrows {Restore-GoatTransaction $session $tx2.Id -Consent} 'wrong Windows identity rejected'
+    $script:FixtureIdentity.Machine='MACHINE-FIXTURE'
+    Restore-GoatTransaction $session $tx2.Id -Consent|Out-Null
+    Restore-GoatTransaction $session $tx1.Id -Consent|Out-Null
+    $crash=Invoke-GoatActionBatch -Session $session -Ids explorer-show-extensions -Consent
+    $crashJournal=@(Get-GoatTransactions $session|Where-Object Id -eq $crash.Id)[0]
+    $crashJournal.State='Applying';$crashJournal.Steps[0].State='Applying';Write-GoatJson $crashJournal $crashJournal.JournalPath
+    Restore-GoatTransaction $session $crash.Id -Consent|Out-Null
+    Assert-Core ((Get-GoatTransactions $session|Where-Object Id -eq $crash.Id).State -eq 'Restored') 'recovery handles crash with durable in-flight step'
+    $older=Invoke-GoatActionBatch -Session $session -Ids explorer-show-extensions -Consent
+    $script:ActiveSession=$other
+    $newer=Invoke-GoatActionBatch -Session $other -Ids explorer-show-hidden -Consent
+    $script:ActiveSession=$session
+    Assert-CoreThrows {Restore-GoatTransaction $session $older.Id -Consent} 'restore order is enforced across sibling sessions'
+    $script:ActiveSession=$other;Restore-GoatTransaction $other $newer.Id -Consent|Out-Null
+    $script:ActiveSession=$session;Restore-GoatTransaction $session $older.Id -Consent|Out-Null
+    $malformed=Join-Path $session.Root 'transactions\malformed.json';[IO.File]::WriteAllText($malformed,'{broken')
+    Assert-CoreThrows {Invoke-GoatActionBatch -Session $session -Ids explorer-show-hidden -Consent} 'malformed journal blocks new action'
+    [IO.File]::SetAttributes($malformed,[IO.FileAttributes]::Hidden)
+    Assert-CoreThrows {Invoke-GoatActionBatch -Session $session -Ids explorer-show-hidden -Consent} 'hidden malformed journal cannot disappear from recovery gate'
+    [IO.File]::Delete($malformed)
+    $demo=New-GoatSession -Demo -Root $root
+    $writes=$script:FixtureWrites.Count;$demoTx=Invoke-GoatActionBatch -Session $demo -Ids explorer-show-hidden -Consent
+    Assert-Core ($demoTx.State -eq 'DEMO' -and $writes -eq $script:FixtureWrites.Count -and @(Get-GoatTransactions $demo).Count -eq 0) 'demo has no mutation or recovery journal'
+    $demo.State='Finalized'
+    Assert-CoreThrows {Get-GoatActionPreview $demo @('explorer-show-hidden')} 'finalized session blocks new preview and action'
+    $session.State='Finalized';Save-GoatSession $session;$session.State='Open'
+    Assert-CoreThrows {Get-GoatActionPreview $session @('explorer-show-hidden')} 'stale in-memory model cannot reopen a finalized persisted session'
+} finally {
+    $full=[IO.Path]::GetFullPath($root)
+    if(-not $full.StartsWith([IO.Path]::GetFullPath([IO.Path]::GetTempPath()),[StringComparison]::OrdinalIgnoreCase) -or (Split-Path $full -Leaf) -notlike 'GOAT-Core-Test-*'){throw 'Unsafe fixture cleanup'}
+    Remove-Item -LiteralPath $full -Recurse -Force
 }
-finally {
-    # Only this unique test directory may be recursively removed. Resolve both
-    # paths in PowerShell before deletion and keep the entire operation here.
-    $resolvedSandbox = [IO.Path]::GetFullPath($script:Sandbox)
-    $allowedPrefix = $script:SandboxParent.TrimEnd('\') + '\GOAT-CoreTests-'
-    if (-not $resolvedSandbox.StartsWith($allowedPrefix, [StringComparison]::OrdinalIgnoreCase) -or $resolvedSandbox -eq $script:SandboxParent.TrimEnd('\')) {
-        throw 'Unsafe test cleanup path rejected.'
-    }
-    if (Test-Path -LiteralPath $resolvedSandbox) { Remove-Item -LiteralPath $resolvedSandbox -Recurse -Force }
-}
+[pscustomobject]@{Module='Core';Passed=$script:CoreChecks.Count;Checks=@($script:CoreChecks.ToArray());Mutation='In-memory registry fixtures only'}|ConvertTo-Json -Depth 4

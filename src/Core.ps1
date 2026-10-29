@@ -1,537 +1,352 @@
-﻿# GOAT Tweaks v2.4 - mutation engine. Windows PowerShell 5.1 / x64.
-# UI and scanner never call a mutation unless the technician requests it.
-
-function Test-GoatAdministrator {
-    $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
-    $principal = New-Object Security.Principal.WindowsPrincipal($identity)
-    return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+﻿# GOAT Tweaks: original session, persistence and transaction engine. PS 5.1.
+function Assert-GoatPlainFilePath {
+    param([Parameter(Mandatory=$true)][string]$Path)
+    $current=[IO.Path]::GetFullPath($Path)
+    while($current){
+        if(Test-Path -LiteralPath $current){$item=Get-Item -LiteralPath $current -Force -ErrorAction Stop;if($item.Attributes -band [IO.FileAttributes]::ReparsePoint){throw 'Caminho com link/junction/reparse point bloqueado para preservar o destino exato.'}}
+        $parent=Split-Path $current -Parent;if($parent -eq $current){break};$current=$parent
+    }
 }
-
-function Get-GoatStorageRoot {
-    if (Test-Path -LiteralPath 'D:\' -PathType Container) { return 'D:\GoatTweaks' }
-    return (Join-Path ([Environment]::GetFolderPath('CommonApplicationData')) 'GoatTweaks')
-}
-
-function Get-GoatMachineIdentity {
-    $machine = (Get-ItemProperty -LiteralPath 'HKLM:\SOFTWARE\Microsoft\Cryptography' -Name MachineGuid -ErrorAction Stop).MachineGuid
-    return [pscustomobject]@{ MachineGuid = [string]$machine; UserSid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value }
-}
-
-function Get-GoatRegistryState {
-    param([Parameter(Mandatory=$true)][string]$Path, [Parameter(Mandatory=$true)][string]$Name)
-    $base = $null; $key = $null
+function Write-GoatJson {
+    param([Parameter(Mandatory)]$Value,[Parameter(Mandatory)][string]$Path)
+    $Path=[IO.Path]::GetFullPath($Path)
+    Assert-GoatPlainFilePath $Path
+    $directory = Split-Path -Parent $Path
+    [void][IO.Directory]::CreateDirectory($directory)
+    $temporary = Join-Path $directory ([guid]::NewGuid().ToString('N') + '.tmp')
+    $bytes = [Text.UTF8Encoding]::new($false).GetBytes(($Value | ConvertTo-Json -Depth 64))
     try {
-        if ($Path.StartsWith('HKCU:\')) { $hive = [Microsoft.Win32.RegistryHive]::CurrentUser; $subPath = $Path.Substring(6) }
-        elseif ($Path.StartsWith('HKLM:\')) { $hive = [Microsoft.Win32.RegistryHive]::LocalMachine; $subPath = $Path.Substring(6) }
-        else { throw "Hive não permitida: $Path" }
-        $base = [Microsoft.Win32.RegistryKey]::OpenBaseKey($hive, [Microsoft.Win32.RegistryView]::Registry64)
-        $key = $base.OpenSubKey($subPath, $false)
-        $keyExists = $null -ne $key
-        $exists = $keyExists -and @($key.GetValueNames()) -contains $Name
-        $value = $null; $type = 'DWord'
-        if ($exists) {
-            $type = $key.GetValueKind($Name).ToString()
-            $value = $key.GetValue($Name, $null, [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
+        $stream = [IO.File]::Open($temporary,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::None)
+        try { $stream.Write($bytes,0,$bytes.Length); $stream.Flush($true) } finally { $stream.Dispose() }
+        if ([IO.File]::Exists($Path)) {
+            # PS5.1 coerces a null backupFileName to an invalid empty string.
+            # Use a unique sibling backup and remove it only after atomic replace.
+            $previous=$temporary+'.previous'
+            [IO.File]::Replace($temporary,$Path,$previous)
+            if([IO.File]::Exists($previous)){[IO.File]::Delete($previous)}
         }
-        return [pscustomobject]@{ Path=$Path; Name=$Name; Exists=[bool]$exists; KeyExisted=$keyExists; Value=$value; Type=$type }
-    } finally { if ($key) { $key.Dispose() }; if ($base) { $base.Dispose() } }
+        else { [IO.File]::Move($temporary,$Path) }
+    } finally { if ([IO.File]::Exists($temporary)) { [IO.File]::Delete($temporary) } }
 }
-
-function Set-GoatRegistryState {
-    param([Parameter(Mandatory=$true)]$State)
-    $base = $null; $key = $null
-    try {
-        if ($State.Path.StartsWith('HKCU:\')) { $hive = [Microsoft.Win32.RegistryHive]::CurrentUser; $subPath = $State.Path.Substring(6) }
-        elseif ($State.Path.StartsWith('HKLM:\')) { $hive = [Microsoft.Win32.RegistryHive]::LocalMachine; $subPath = $State.Path.Substring(6) }
-        else { throw 'Hive inválida no diário.' }
-        $base = [Microsoft.Win32.RegistryKey]::OpenBaseKey($hive, [Microsoft.Win32.RegistryView]::Registry64)
-        if ($State.Exists) {
-            $kind = [Microsoft.Win32.RegistryValueKind][Enum]::Parse([Microsoft.Win32.RegistryValueKind], [string]$State.Type, $true)
-            $value = $State.Value
-            switch ([string]$State.Type) {
-                'DWord' { $value = [int]$value }
-                'QWord' { $value = [long]$value }
-                'Binary' { $value = [byte[]]$value }
-                'MultiString' { $value = [string[]]$value }
-                'String' { $value = [string]$value }
-                'ExpandString' { $value = [string]$value }
-                default { throw "Tipo de registro não suportado: $($State.Type)" }
-            }
-            $key = $base.CreateSubKey($subPath)
-            $key.SetValue([string]$State.Name, $value, $kind)
-        } else {
-            $key = $base.OpenSubKey($subPath, $true)
-            if ($key) {
-                $key.DeleteValue([string]$State.Name, $false)
-                $canDelete = (-not $State.KeyExisted) -and $key.ValueCount -eq 0 -and $key.SubKeyCount -eq 0
-                $key.Dispose(); $key = $null
-                if ($canDelete) { $base.DeleteSubKey($subPath, $false) }
-            }
-        }
-    } finally { if ($key) { $key.Dispose() }; if ($base) { $base.Dispose() } }
+function Get-GoatIdentity {
+    $machine = [Microsoft.Win32.Registry]::GetValue('HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Cryptography','MachineGuid',$null)
+    if (-not $machine) { throw 'Identidade do Windows indisponível; mutações bloqueadas.' }
+    [pscustomobject]@{Machine=[string]$machine;Sid=[Security.Principal.WindowsIdentity]::GetCurrent().User.Value}
 }
-
-function New-GoatRegistryTarget {
-    param([string]$Path, [string]$Name, $Value, [string]$Type = 'DWord')
-    return [pscustomobject]@{ Path=$Path; Name=$Name; Exists=$true; KeyExisted=$true; Value=$Value; Type=$Type }
-}
-
-function Invoke-GoatNative {
-    param([Parameter(Mandatory=$true)][string]$File, [Parameter(Mandatory=$true)][string[]]$Arguments)
-    # Only fixed, allowlisted commands use this helper. No Invoke-Expression.
-    $output = @(& $File @Arguments 2>&1)
-    $code = $LASTEXITCODE
-    if ($code -ne 0) { throw "$File retornou $code : $($output -join ' ')" }
-    return ($output -join [Environment]::NewLine)
-}
-
-function Get-GoatActivePowerScheme {
-    $output = Invoke-GoatNative -File "$env:SystemRoot\System32\powercfg.exe" -Arguments @('/getactivescheme')
-    $match = [regex]::Match($output, '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}')
-    if (-not $match.Success) { throw 'Não foi possível identificar o plano de energia ativo.' }
-    return $match.Value.ToLowerInvariant()
-}
-
-function Get-GoatTcpAutoTuning {
-    $setting = Get-NetTCPSetting -SettingName Internet -ErrorAction Stop
-    $value = ([string]$setting.AutoTuningLevelLocal).ToLowerInvariant()
-    if ($value -notin @('disabled','highlyrestricted','restricted','normal','experimental')) {
-        throw "Auto-tuning não reconhecido: $value"
+function New-GoatSession {
+    param([switch]$Demo,[string]$Root)
+    if (-not $Root) { $Root=Join-Path $env:LOCALAPPDATA 'GOAT-Tweaks\Sessions' }
+    $id=[guid]::NewGuid().ToString('N')
+    $session=[pscustomobject]@{
+        SchemaVersion=1;Id=$id;CreatedUtc=[DateTime]::UtcNow.ToString('o');State='Open';Demo=[bool]$Demo
+        Objective='Equilibrado';Mode='Local';Consent=$false;Inventory=$null;Profiles=@();Benchmarks=@();Comparison=$null
+        Root=(Join-Path ([IO.Path]::GetFullPath($Root)) $id);Events=@();Exports=@();FinalExport=$null
     }
-    return $value
+    [void][IO.Directory]::CreateDirectory($session.Root)
+    Save-GoatSession $session
+    return $session
 }
-
-function Get-GoatMemoryCompression {
-    $agent=Get-MMAgent -ErrorAction Stop
-    if ($null -eq $agent -or $agent.MemoryCompression -isnot [bool]) { throw 'Estado de compressão de memória indisponível.' }
-    return [bool]$agent.MemoryCompression
+function Save-GoatSession {
+    param($Session)
+    # Never persist the read-only scan merely because it is visible in the UI.
+    # Copy the model so the UI keeps its current inventory in memory.
+    $persisted=$Session|ConvertTo-Json -Depth 64|ConvertFrom-Json
+    if($Session.Consent -isnot [bool] -or -not $Session.Consent){$persisted.Inventory=$null}
+    Write-GoatJson $persisted (Join-Path $Session.Root 'session.json')
 }
-
-function Get-GoatNativeOptionDefinitions {
-    if (-not $script:GoatNativeOptionsJson) { return @() }
-    $catalog=$script:GoatNativeOptionsJson | ConvertFrom-Json -ErrorAction Stop
-    if ($catalog.SchemaVersion -ne 1) { throw 'Catálogo nativo incompatível.' }
-    $ids=@{}
-    foreach ($option in @($catalog.Options)) {
-        if ($option.Id -notmatch '^[a-z0-9-]+$' -or $ids.ContainsKey([string]$option.Id)) { throw 'ID nativo inválido ou duplicado.' }
-        $ids[[string]$option.Id]=$true
-        if (@($option.OnTargets).Count -eq 0 -or @($option.OffTargets).Count -eq 0) { throw 'Opção nativa sem os dois estados revisados.' }
-        $onKeys=@{}
-        foreach ($target in @($option.OnTargets)+@($option.OffTargets)) {
-            if ($target.Path -notmatch '^HK(CU|LM):\\' -or [string]::IsNullOrWhiteSpace($target.Name) -or $target.Type -notin @('DWord','String') -or $target.Exists -isnot [bool]) { throw 'Alvo de Registro nativo inválido.' }
-        }
-        foreach ($target in $option.OnTargets) { $onKeys[$target.Path+'|'+$target.Name]=$true }
-        foreach ($target in $option.OffTargets) { if (-not $onKeys.ContainsKey($target.Path+'|'+$target.Name)) { throw 'Estado alternativo fora dos alvos revisados.' } }
-    }
-    return @($catalog.Options)
-}
-
-function Test-GoatRegistryTargetsMatch {
-    param([object[]]$Targets)
-    if ($Targets.Count -eq 0) { return $false }
-    foreach ($target in $Targets) {
-        $actual=Get-GoatRegistryState $target.Path $target.Name
-        if ([bool]$actual.Exists -ne [bool]$target.Exists) { return $false }
-        if ($target.Exists -and ($actual.Type -ne $target.Type -or (ConvertTo-Json -InputObject $actual.Value -Compress) -ne (ConvertTo-Json -InputObject $target.Value -Compress))) { return $false }
-    }
-    return $true
-}
-
-function Get-GoatTweaks {
-    param([Parameter(Mandatory=$true)]$Scan)
-    $list = New-Object System.Collections.Generic.List[object]
-    $definitions = @(
-        @{ Id='game-mode'; Category='Sistema'; Title='Ativar Modo de Jogo do Windows'; Description='Ativa a preferência do usuário. O efeito depende do jogo e da versão do Windows; não é medição de ganho.'; Risk='Baixo'; Recommended=$true; Restart=$false; Targets=@(
-            (New-GoatRegistryTarget 'HKCU:\Software\Microsoft\GameBar' 'AutoGameModeEnabled' 1),
-            (New-GoatRegistryTarget 'HKCU:\Software\Microsoft\GameBar' 'AllowAutoGameMode' 1)) },
-        @{ Id='capture-off'; Category='Sistema'; Title='Desativar captura de jogos em segundo plano'; Description='Desliga preferências de captura do usuário. Se o cliente grava clipes pela Xbox Game Bar, mantenha desmarcado.'; Risk='Baixo'; Recommended=$true; Restart=$false; Targets=@(
-            (New-GoatRegistryTarget 'HKCU:\Software\Microsoft\Windows\CurrentVersion\GameDVR' 'AppCaptureEnabled' 0),
-            (New-GoatRegistryTarget 'HKCU:\System\GameConfigStore' 'GameDVR_Enabled' 0)) },
-        @{ Id='visual-effects'; Category='Sistema'; Title='Reduzir efeitos visuais da interface'; Description='Reduz animações de janelas e transparência. Pode melhorar a resposta visual em PCs limitados; sair e entrar na sessão aplica todas as preferências.'; Risk='Baixo'; Recommended=$false; Restart=$true; Targets=@(
-            (New-GoatRegistryTarget 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects' 'VisualFXSetting' 2),
-            (New-GoatRegistryTarget 'HKCU:\Control Panel\Desktop\WindowMetrics' 'MinAnimate' '0' 'String'),
-            (New-GoatRegistryTarget 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize' 'EnableTransparency' 0)) },
-        @{ Id='mouse-linear'; Category='Sistema'; Title='Desativar aceleração do ponteiro'; Description='Desativa a aceleração do ponteiro do Windows para preferência de entrada linear. Jogos com Raw Input podem ignorar esta configuração. Requer nova sessão.'; Risk='Moderado'; Recommended=$false; Restart=$true; Targets=@(
-            (New-GoatRegistryTarget 'HKCU:\Control Panel\Mouse' 'MouseSpeed' '0' 'String'),
-            (New-GoatRegistryTarget 'HKCU:\Control Panel\Mouse' 'MouseThreshold1' '0' 'String'),
-            (New-GoatRegistryTarget 'HKCU:\Control Panel\Mouse' 'MouseThreshold2' '0' 'String')) },
-        @{ Id='background-apps'; Category='Sistema'; Title='Restringir apps UWP em segundo plano'; Description='Define preferência global de atividade em segundo plano para apps compatíveis. Pode afetar notificações. Não desinstala aplicativos.'; Risk='Moderado'; Recommended=$false; Restart=$true; Targets=@(
-            (New-GoatRegistryTarget 'HKCU:\Software\Microsoft\Windows\CurrentVersion\BackgroundAccessApplications' 'GlobalUserDisabled' 1)) }
-    )
-    $nativeOptions=@(Get-GoatNativeOptionDefinitions)
-    foreach ($option in $nativeOptions) {
-        if (@($definitions | Where-Object Id -eq $option.Id).Count -gt 0 -or $option.Id -in @('memory-compression','power-high','tcp-normal','rss-on')) { throw 'ID duplicado com o catálogo original.' }
-        $definitions+=@{Id=$option.Id;Category=$option.Category;Title=$option.Title;Description=$option.Description;Risk=$option.Risk;Restart=$option.RequiresRestart;Recommended=$false;Targets=@($option.OnTargets);MinBuild=$option.MinBuild;MaxBuild=$option.MaxBuild}
-    }
-    foreach ($definition in $definitions) {
-        $available = [bool]$Scan.OS.Supported; $reason = ''; $applied = $true
-        if (-not $available) { $reason = 'Edição/build do Windows fora da faixa validada (Windows 10/11, build 19041+).' }
-        if ($definition.MinBuild -and (-not $Scan.OS.Build -or $Scan.OS.Build -lt $definition.MinBuild)) { $available=$false; $reason='Opção exige Windows build '+$definition.MinBuild+' ou superior.' }
-        if ($definition.MaxBuild -and $Scan.OS.Build -gt $definition.MaxBuild) { $available=$false; $reason='Opção não revisada nesta build do Windows.' }
-        foreach ($target in $definition.Targets) {
-            if ($Scan.IsDemo) { $applied = $false; continue }
-            try {
-                $state = Get-GoatRegistryState -Path $target.Path -Name $target.Name
-                if (-not $state.Exists -or $state.Type -ne $target.Type -or [string]$state.Value -ne [string]$target.Value) { $applied = $false }
-            } catch { $available = $false; $applied = $false; $reason = $_.Exception.Message }
-        }
-        $status = 'Disponível'; if ($applied) { $status='Aplicado' }; if (-not $available) { $status='Indisponível' }
-        $list.Add([pscustomobject]@{ Id=$definition.Id; Category=$definition.Category; Title=$definition.Title; Description=$definition.Description; Risk=$definition.Risk; Recommended=($definition.Recommended -and -not $applied -and $available); Available=$available; UnavailableReason=$reason; RequiresRestart=$definition.Restart; State=$status; Kind='Registry'; Targets=@($definition.Targets) })
-    }
-    $powerId = '8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c'
-    $extras = @(
-        @{Id='memory-compression';Category='RAM';Title='Ativar compressão de memória';Description='Ativa somente Memory Compression pelo MMAgent. Revise a carga e compare paginação/uso de CPU; não garante ganho em jogos. O estado anterior é salvo para desfazer.';Kind='MemoryCompression';Target=$true;Restart=$true;Risk='Moderado'},
-        @{Id='power-high';Category='CPU';Title='Selecionar plano Alto Desempenho';Description='Usa o plano existente do Windows. Pode aumentar consumo, temperatura e ruído; compare antes/depois. Não altera C-States no firmware.';Kind='Power';Target=$powerId;Restart=$false;Risk='Moderado'},
-        @{Id='tcp-normal';Category='Rede';Title='Auto-tuning TCP Internet para Normal';Description='Define Normal apenas no perfil TCP Internet, preservando os demais perfis. Afeta throughput, sem promessa de redução de ping. Não substitui diagnóstico de rede.';Kind='Tcp';Target='normal';Restart=$false;Risk='Moderado'},
-        @{Id='rss-on';Category='Rede';Title='Habilitar RSS global';Description='Permite distribuir processamento de recepção em NICs compatíveis. Mantém offloads de checksum e LSO. Não altera propriedades específicas do fabricante.';Kind='Rss';Target='Enabled';Restart=$false;Risk='Moderado'}
-    )
-    foreach ($definition in $extras) {
-        $available = [bool]$Scan.OS.Supported; $reason=''; $applied=$false
-        if (-not $available) { $reason='Windows não suportado.' }
-        if ($Scan.IsDemo -and $definition.Kind -in @('MemoryCompression','Tcp','Rss') -and $Scan.AdvancedState) {
-            $probeKey=@{MemoryCompression='memory-compression';Tcp='network-autotuning';Rss='rss'}[$definition.Kind]
-            $reading=$null
-            if ($Scan.AdvancedState.Readings -is [Collections.IDictionary]) { $reading=$Scan.AdvancedState.Readings[$probeKey] }
-            else { $property=$Scan.AdvancedState.Readings.PSObject.Properties[$probeKey]; if ($property) { $reading=$property.Value } }
-            if ($reading.Available -and (($definition.Kind -eq 'MemoryCompression' -and $reading.Value -is [bool]) -or ($definition.Kind -ne 'MemoryCompression' -and $reading.Value -is [string]))) { $applied=$reading.Value -eq $definition.Target }
-            else { $available=$false; $reason='Estado demonstrativo indisponível.' }
-        }
-        if (-not $Scan.IsDemo -and $available) {
-            try {
-                switch ($definition.Kind) {
-                    'MemoryCompression' { $applied=Get-GoatMemoryCompression; Get-Command Enable-MMAgent,Disable-MMAgent -ErrorAction Stop | Out-Null }
-                    'Power' {
-                        $plans = Invoke-GoatNative "$env:SystemRoot\System32\powercfg.exe" @('/list')
-                        if ($plans -notmatch $powerId) { $available=$false; $reason='Plano não oferecido por este computador (comum em Modern Standby). Nenhum plano será criado.' }
-                        $applied = (Get-GoatActivePowerScheme) -eq $powerId
-                    }
-                    'Tcp' { $applied = (Get-GoatTcpAutoTuning) -eq 'normal' }
-                    'Rss' { $applied = ([string](Get-NetOffloadGlobalSetting -ErrorAction Stop).ReceiveSideScaling) -eq 'Enabled' }
-                }
-            } catch { $available=$false; $reason=$_.Exception.Message }
-        }
-        $status='Disponível'; if ($applied) {$status='Aplicado'}; if (-not $available) {$status='Indisponível'}
-        $list.Add([pscustomobject]@{Id=$definition.Id;Category=$definition.Category;Title=$definition.Title;Description=$definition.Description;Risk=$definition.Risk;Recommended=($definition.Kind -eq 'MemoryCompression' -and $available -and -not $applied);Available=$available;UnavailableReason=$reason;RequiresRestart=$definition.Restart;State=$status;Kind=$definition.Kind;Target=$definition.Target;Targets=@()})
-    }
-    foreach ($item in $list) {
-        $native=@($nativeOptions | Where-Object Id -eq $item.Id)
-        $offTargets=@(); $offTarget=$null; $canDisable=$false; $offState=$false
-        $onLabel='Aplicar'; $offLabel='Usar padrão'; $policy='Manual'; $desired='On'; $sources=@(); $benefit='Preferência'; $conflictGroup=''
-        if ($native.Count -eq 1) {
-            $definition=$native[0]; $offTargets=@($definition.OffTargets);$canDisable=$true
-            $onLabel=$definition.OnLabel;$offLabel=$definition.OffLabel;$policy=$definition.SelectionPolicy;$sources=@($definition.Sources);$benefit=$definition.Benefit;$conflictGroup=$definition.ConflictGroup
-            if ($definition.RecommendedDirection) {$desired=$definition.RecommendedDirection}
-        } else {
-            switch ($item.Id) {
-                'game-mode' { $policy='Gaming';$onLabel='Ativar';$offLabel='Desativar';$benefit='Jogos';$offTargets=@($item.Targets|ForEach-Object {New-GoatRegistryTarget $_.Path $_.Name 0}) }
-                'capture-off' { $policy='Gaming';$onLabel='Desligar captura';$offLabel='Permitir captura';$benefit='Gravação';$offTargets=@($item.Targets|ForEach-Object {New-GoatRegistryTarget $_.Path $_.Name 1}) }
-                'visual-effects' { $policy='LowMemory';$onLabel='Reduzir efeitos';$offLabel='Usar padrão';$benefit='Interface';$offTargets=@($item.Targets|ForEach-Object {[pscustomobject]@{Path=$_.Path;Name=$_.Name;Exists=$false;KeyExisted=$true;Value=$null;Type=$_.Type}}) }
-                'background-apps' { $onLabel='Restringir';$offLabel='Permitir';$benefit='Segundo plano';$offTargets=@($item.Targets|ForEach-Object {New-GoatRegistryTarget $_.Path $_.Name 0}) }
-                'memory-compression' { $policy='MemoryPressure';$onLabel='Ativar';$offLabel='Desativar';$benefit='Memória';$canDisable=$true;$offTarget=$false }
-                'rss-on' { $policy='NetworkRepair';$onLabel='Ativar RSS';$offLabel='Desativar RSS';$benefit='Rede';$canDisable=$true;$offTarget='Disabled' }
-                'tcp-normal' { $policy='NetworkRepair';$benefit='Rede' }
-                'power-high' { $benefit='Energia' }
-            }
-            if ($offTargets.Count -gt 0) { $canDisable=$true }
-        }
-        if ($canDisable -and $item.Available -and -not $Scan.IsDemo) {
-            try {
-                if ($item.Kind -eq 'Registry') {$offState=Test-GoatRegistryTargetsMatch $offTargets}
-                elseif ($item.Kind -eq 'MemoryCompression') {$offState=-not (Get-GoatMemoryCompression)}
-                elseif ($item.Kind -eq 'Rss') {$offState=([string](Get-NetOffloadGlobalSetting -ErrorAction Stop).ReceiveSideScaling) -eq 'Disabled'}
-            } catch { $item.Available=$false;$item.State='Indisponível';$item.UnavailableReason=$_.Exception.Message }
-        } elseif ($Scan.IsDemo -and $item.Kind -in @('MemoryCompression','Rss')) { $offState=$item.State -ne 'Aplicado' }
-        $properties=@{CanDisable=$canDisable;OnState=($item.State -eq 'Aplicado');OffState=$offState;OffTargets=$offTargets;OffTarget=$offTarget;OnLabel=$onLabel;OffLabel=$offLabel;SelectionPolicy=$policy;DesiredState=$desired;RecommendedDirection=$desired;Sources=$sources;SourceLinks=$sources;Benefit=$benefit;ConflictGroup=$conflictGroup;RecommendationReason='Aguardando comparação com o perfil desta máquina.'}
-        foreach ($name in $properties.Keys) {$item|Add-Member -NotePropertyName $name -NotePropertyValue $properties[$name] -Force}
-    }
-    return $list.ToArray()
-}
-
-function Write-GoatJournal {
-    param($Journal, [string]$Path)
-    $temporary = "$Path.tmp"
-    $json = $Journal | ConvertTo-Json -Depth 16
-    $bytes = (New-Object Text.UTF8Encoding($true)).GetBytes($json)
-    $stream = New-Object IO.FileStream($temporary, [IO.FileMode]::Create, [IO.FileAccess]::Write, [IO.FileShare]::None)
-    try { $stream.Write($bytes,0,$bytes.Length); $stream.Flush($true) } finally { $stream.Dispose() }
-    if ([IO.File]::Exists($Path)) { [IO.File]::Replace($temporary,$Path,"$Path.previous",$true) }
-    else { [IO.File]::Move($temporary,$Path) }
-}
-
-function Write-GoatLog {
-    param([string]$Path, [string]$Message, [string]$Level='INFO')
-    $line = '{0} [{1}] {2}' -f ([DateTime]::UtcNow.ToString('o')), $Level, $Message
-    Add-Content -LiteralPath $Path -Value $line -Encoding UTF8 -ErrorAction Stop
-}
-
-function Send-GoatProgress {
-    param([scriptblock]$Callback, [string]$Message)
-    if ($Callback) { & $Callback $Message | Out-Null }
-}
-
-function New-GoatRestorePoint {
-    param([string]$TransactionId, [string]$LogPath)
-    $description = "GOAT v2.2 $TransactionId"
-    $before = @(Get-CimInstance -Namespace 'root/default' -ClassName SystemRestore -OperationTimeoutSec 20 -ErrorAction Stop)
-    $maxSequence = 0
-    foreach ($point in $before) { if ([long]$point.SequenceNumber -gt $maxSequence) { $maxSequence=[long]$point.SequenceNumber } }
-    Write-GoatLog $LogPath "COMMAND Checkpoint-Computer -Description '$description' -RestorePointType MODIFY_SETTINGS"
-    Checkpoint-Computer -Description $description -RestorePointType MODIFY_SETTINGS -ErrorAction Stop -WarningAction SilentlyContinue
-    $after = @(Get-CimInstance -Namespace 'root/default' -ClassName SystemRestore -OperationTimeoutSec 20 -ErrorAction Stop)
-    $created = @($after | Where-Object { [long]$_.SequenceNumber -gt $maxSequence -and $_.Description -eq $description })
-    if ($created.Count -eq 0) {
-        throw 'Nenhum ponto de restauração NOVO foi confirmado. O Windows limita a criação a um a cada 24h. Verifique a Proteção do Sistema; nenhum tweak foi aplicado. A frequência de restauração não será alterada automaticamente.'
-    }
-    $sequence = [long]($created | Sort-Object SequenceNumber -Descending | Select-Object -First 1).SequenceNumber
-    Write-GoatLog $LogPath "RestorePoint confirmado: SequenceNumber=$sequence"
-    return $sequence
-}
-
-function Get-GoatStepOriginal {
-    param($Tweak, $Target)
-    switch ($Tweak.Kind) {
-        'Registry' {
-            $state=Get-GoatRegistryState $Target.Path $Target.Name
-            if ($state.Exists -and $state.Type -notin @('DWord','QWord','String','ExpandString','Binary','MultiString')) {
-                throw "Tipo original de Registro não reversível: $($state.Type). Nenhum ajuste será iniciado."
-            }
-            return $state
-        }
-        'Power' { return (Get-GoatActivePowerScheme) }
-        'MemoryCompression' { return (Get-GoatMemoryCompression) }
-        'Tcp' { return (Get-GoatTcpAutoTuning) }
-        'Rss' {
-            $value = [string](Get-NetOffloadGlobalSetting -ErrorAction Stop).ReceiveSideScaling
-            if ($value -notin @('Enabled','Disabled')) { throw "RSS não reconhecido: $value" }
-            return $value
-        }
-        default { throw 'Operação não permitida.' }
-    }
-}
-
-function Set-GoatStepValue {
-    param($Step, $Value, [string]$LogPath)
-    switch ($Step.Kind) {
-        'MemoryCompression' {
-            if ($Value -isnot [bool]) { throw 'Estado de compressão inválido no diário.' }
-            if ($Value) {
-                Write-GoatLog $LogPath 'COMMAND Enable-MMAgent -MemoryCompression'
-                Enable-MMAgent -MemoryCompression -ErrorAction Stop | Out-Null
-            } else {
-                Write-GoatLog $LogPath 'COMMAND Disable-MMAgent -MemoryCompression'
-                Disable-MMAgent -MemoryCompression -ErrorAction Stop | Out-Null
-            }
-            if ((Get-GoatMemoryCompression) -ne $Value) { throw 'Compressão de memória não confirmada.' }
-        }
-        'Registry' {
-            Write-GoatLog $LogPath ('REGISTRY ' + ($Value | ConvertTo-Json -Compress -Depth 6))
-            Set-GoatRegistryState $Value
-            $actual = Get-GoatRegistryState $Value.Path $Value.Name
-            if ([bool]$actual.Exists -ne [bool]$Value.Exists) { throw "Falha de verificação: $($Value.Path)\$($Value.Name)" }
-            if ($Value.Exists) {
-                $expectedJson = ConvertTo-Json -InputObject $Value.Value -Compress
-                $actualJson = ConvertTo-Json -InputObject $actual.Value -Compress
-                if ($actual.Type -ne $Value.Type -or $actualJson -ne $expectedJson) { throw "Valor não confirmado: $($Value.Path)\$($Value.Name)" }
-            }
-        }
-        'Power' {
-            if ([string]$Value -notmatch '^[0-9a-fA-F-]{36}$') { throw 'GUID de energia inválido.' }
-            Write-GoatLog $LogPath "COMMAND powercfg.exe /setactive $Value"
-            Invoke-GoatNative "$env:SystemRoot\System32\powercfg.exe" @('/setactive',[string]$Value) | Out-Null
-            if ((Get-GoatActivePowerScheme) -ne [string]$Value) { throw 'Plano de energia não confirmado.' }
-        }
-        'Tcp' {
-            if ([string]$Value -notin @('disabled','highlyrestricted','restricted','normal','experimental')) { throw 'Auto-tuning inválido.' }
-            Write-GoatLog $LogPath "COMMAND Set-NetTCPSetting -SettingName Internet -AutoTuningLevelLocal $Value"
-            Set-NetTCPSetting -SettingName Internet -AutoTuningLevelLocal ([string]$Value) -ErrorAction Stop | Out-Null
-            if ((Get-GoatTcpAutoTuning) -ne [string]$Value) { throw 'TCP auto-tuning não confirmado.' }
-        }
-        'Rss' {
-            if ([string]$Value -notin @('Enabled','Disabled')) { throw 'RSS inválido.' }
-            Write-GoatLog $LogPath "COMMAND Set-NetOffloadGlobalSetting -ReceiveSideScaling $Value"
-            Set-NetOffloadGlobalSetting -ReceiveSideScaling ([string]$Value) -ErrorAction Stop | Out-Null
-            if ([string](Get-NetOffloadGlobalSetting -ErrorAction Stop).ReceiveSideScaling -ne [string]$Value) { throw 'RSS não confirmado.' }
-        }
-        default { throw 'Tipo de operação inválido.' }
-    }
-}
-
-function New-GoatResult {
-    param([bool]$Success, [string]$Message, [string]$TransactionId='', [string]$LogPath='')
-    return [pscustomobject]@{Success=$Success;Message=$Message;TransactionId=$TransactionId;LogPath=$LogPath}
-}
-
-function Invoke-GoatApply {
+function Import-GoatSession {
     [CmdletBinding()]
-    param([Parameter(Mandatory=$true)][string[]]$Ids, [Parameter(Mandatory=$true)]$Scan, [switch]$Demo, [scriptblock]$ProgressCallback,[hashtable]$Directions=@{})
-    if ($Demo -or $Scan.IsDemo) { return New-GoatResult $true "DEMONSTRAÇÃO: $($Ids.Count) opções simuladas. Nenhuma configuração foi alterada." }
-    $mutex=$null; $locked=$false; $journal=$null; $journalPath=''; $logPath=''; $transactionId=''
+    param([Parameter(Mandatory=$true)][string]$Path,[switch]$Demo)
+    $file=Get-Item -LiteralPath $Path -ErrorAction Stop
+    Assert-GoatPlainFilePath $file.FullName
+    if($file.PSIsContainer -or $file.Name -ine 'session.json' -or $file.Length -gt 64MB -or ($file.Attributes -band [IO.FileAttributes]::ReparsePoint)){throw 'Selecione um arquivo session.json regular de até 64 MiB.'}
+    $loadMutex=[Threading.Mutex]::new($false,'Local\GOAT-Tweaks-Actions');$loadLocked=$false
     try {
-        if (-not (Test-GoatAdministrator)) { throw 'Abra o aplicativo como administrador para aplicar alterações. O diagnóstico funciona sem elevação.' }
-        if (-not [Environment]::Is64BitProcess) { throw 'Use o Windows PowerShell de 64 bits.' }
-        if (-not $Scan.OS.Supported) { throw 'Windows não suportado para alterações.' }
-        $mutex = New-Object System.Threading.Mutex($false, 'Global\GOAT-Tweaks-v2.2-Mutation')
-        try { $locked=$mutex.WaitOne(0) } catch [System.Threading.AbandonedMutexException] { $locked=$true }
-        if (-not $locked) { throw 'Outra sessão GOAT está aplicando ou restaurando configurações.' }
-        $catalog = @(Get-GoatTweaks -Scan $Scan)
-        $selected = New-Object System.Collections.Generic.List[object]
-        foreach ($id in @($Ids | Select-Object -Unique)) {
-            $entry = @($catalog | Where-Object { $_.Id -eq $id })
-            if ($entry.Count -ne 1) { throw "Opção desconhecida: $id" }
-            if (-not $entry[0].Available) { throw "$($entry[0].Title): $($entry[0].UnavailableReason)" }
-            $direction='On';if ($Directions.ContainsKey($id)) {$direction=[string]$Directions[$id]}
-            if ($direction -notin @('On','Off')) {throw 'Direção de ajuste inválida.'}
-            if ($direction -eq 'Off' -and -not $entry[0].CanDisable) {throw 'Este ajuste não possui estado alternativo revisado. Use Restaurar para recuperar o original.'}
-            if ($direction -eq 'On' -and $entry[0].State -eq 'Aplicado') {continue}
-            if ($direction -eq 'Off' -and $entry[0].OffState) {continue}
-            $chosen=$entry[0].PSObject.Copy()
-            if ($direction -eq 'Off') {if ($chosen.Kind -eq 'Registry') {$chosen.Targets=@($chosen.OffTargets)} else {$chosen.Target=$chosen.OffTarget}}
-            $selected.Add($chosen)
+    try{$loadLocked=$loadMutex.WaitOne(0)}catch [Threading.AbandonedMutexException]{$loadLocked=$true}
+    if(-not $loadLocked){throw 'Outra operação GOAT está ativa. Aguarde antes de retomar a sessão.'}
+    $session=Get-Content -LiteralPath $file.FullName -Raw -Encoding UTF8|ConvertFrom-Json -ErrorAction Stop
+    if($session -is [array] -or $session.SchemaVersion -ne 1 -or [string]$session.Id -notmatch '^[a-f0-9]{32}$' -or $session.Demo -isnot [bool] -or $session.Consent -isnot [bool] -or $session.State -notin @('Open','Finalizing','Finalized')){throw 'Schema, identidade ou estado da sessão inválido.'}
+    $created=[datetime]::MinValue;if(-not [datetime]::TryParse([string]$session.CreatedUtc,[ref]$created)){throw 'Horário da sessão inválido.'}
+    foreach($field in @('Events','Exports','Profiles','Benchmarks')){if($session.$field -isnot [array]){throw ('Coleção inválida na sessão: '+$field)}}
+    foreach($field in @('Inventory','Root','FinalExport','Comparison','Objective','Mode')){if($null -eq $session.PSObject.Properties[$field]){throw ('Campo ausente na sessão: '+$field)}}
+    if($session.Mode -notin @('Local','Remoto') -or $session.Objective -notin @('Equilibrado','Competitivo','Qualidade')){throw 'Contexto de atendimento inválido.'}
+    if($PSBoundParameters.ContainsKey('Demo') -and $session.Demo -ne [bool]$Demo){throw 'O modo da sessão não corresponde ao modo de execução solicitado.'}
+    $warnings=New-Object 'System.Collections.Generic.List[string]'
+    $session.Root=[IO.Path]::GetFullPath($file.DirectoryName)
+    if(-not $session.Consent -and $null -ne $session.Inventory){$session.Inventory=$null;$warnings.Add('Inventário encontrado sem consentimento de persistência; descartado da sessão carregada.')}
+    # Reading and validating journals also blocks malformed/unknown targets before
+    # the imported model can reach any action handler.
+    @(Get-GoatTransactions $session)|Out-Null
+    if($session.State -eq 'Finalizing'){
+        $verified=$false
+        if($session.FinalExport -and (Get-Command Test-GoatExport -ErrorAction SilentlyContinue)){
+            try{$verified=[bool](Test-GoatExport -Directory $session.FinalExport -ExpectedSessionId $session.Id -RequireFinalized)}catch{$warnings.Add('Exportação de finalização interrompida não validada: '+$_.Exception.Message)}
         }
-        $targetKeys=@{}
-        foreach ($choice in $selected) {
-            foreach ($target in @($choice.Targets)) {
-                $key=$target.Path+'|'+$target.Name
-                if ($targetKeys.ContainsKey($key)) {throw 'Há opções sobrepostas na seleção. Aplique uma opção por configuração.'}
-                $targetKeys[$key]=$true
-            }
-        }
-        if ($selected.Count -eq 0) { return New-GoatResult $true 'As opções selecionadas já estão aplicadas ou a seleção está vazia.' }
-        $root = Get-GoatStorageRoot
-        foreach ($folder in @('logs','backups')) { [IO.Directory]::CreateDirectory((Join-Path $root $folder)) | Out-Null }
-        # Refuse a new batch while an interrupted/failed undo still needs recovery.
-        foreach ($existing in @(Get-ChildItem -LiteralPath (Join-Path $root 'backups') -Filter '*.json' -File -ErrorAction Stop)) {
-            $old = Get-Content -LiteralPath $existing.FullName -Raw -Encoding UTF8 -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
-            if ($old.Status -in @('Applying','Restoring','RollbackIncomplete')) { throw "Há uma transação pendente ($($old.Id)). Restaure antes de iniciar outro lote." }
-        }
-        $transactionId = ([DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss')) + '-' + [Guid]::NewGuid().ToString('N').Substring(0,8)
-        $logPath = Join-Path $root "logs\$transactionId.log"
-        $journalPath = Join-Path $root "backups\$transactionId.json"
-        $identity = Get-GoatMachineIdentity
-        $journal = [pscustomobject]@{SchemaVersion=1;Id=$transactionId;CreatedUtc=[DateTime]::UtcNow.ToString('o');MachineGuid=$identity.MachineGuid;UserSid=$identity.UserSid;Status='Prepared';RestorePoint=$null;Steps=@()}
-        Write-GoatLog $logPath "BEGIN $transactionId; requested=$($Ids -join ',')"
-        # Capture ALL originals before any system write. Write-ahead journal is durable.
-        foreach ($tweak in $selected) {
-            $targets = @($tweak.Targets)
-            if ($tweak.Kind -ne 'Registry') { $targets=@($tweak.Target) }
-            foreach ($target in $targets) {
-                $original = Get-GoatStepOriginal $tweak $target
-                $journal.Steps += [pscustomobject]@{Id=$tweak.Id;Kind=$tweak.Kind;Original=$original;Target=$target;Status='Prepared'}
-            }
-        }
-        Write-GoatJournal $journal $journalPath
-        Send-GoatProgress $ProgressCallback 'Criando e verificando ponto de restauração...'
-        $journal.RestorePoint = New-GoatRestorePoint $transactionId $logPath
-        $journal.Status='Applying'; Write-GoatJournal $journal $journalPath
-        foreach ($step in $journal.Steps) {
-            # In-flight persisted BEFORE mutation, so interrupted writes are recoverable.
-            $step.Status='Applying'; Write-GoatJournal $journal $journalPath
-            Send-GoatProgress $ProgressCallback "Aplicando $($step.Id)..."
-            Set-GoatStepValue $step $step.Target $logPath
-            $step.Status='Applied'; Write-GoatJournal $journal $journalPath
-        }
-        $journal.Status='Applied'; Write-GoatJournal $journal $journalPath
-        Write-GoatLog $logPath 'COMMIT - todas as alterações foram verificadas.'
-        $needsRestart = @($selected | Where-Object RequiresRestart).Count -gt 0
-        $message = "$($selected.Count) opções aplicadas e verificadas. Configuração anterior salva para restauração."
-        if ($needsRestart) { $message += ' Algumas preferências exigem reinício ou nova sessão.' }
-        return New-GoatResult $true $message $transactionId $logPath
-    } catch {
-        $failure = $_.Exception.Message; $rollbackErrors = @()
-        if ($journal -and @($journal.Steps | Where-Object { $_.Status -in @('Applying','Applied') }).Count -gt 0) {
-            $reverse = @($journal.Steps); [Array]::Reverse($reverse)
-            foreach ($step in $reverse) {
-                if ($step.Status -in @('Applying','Applied')) {
-                    try { Set-GoatStepValue $step $step.Original $logPath; $step.Status='RolledBack' }
-                    catch { $rollbackErrors += $_.Exception.Message }
-                }
-            }
-            $journal.Status='Failed'; if ($rollbackErrors.Count -gt 0) { $journal.Status='RollbackIncomplete' }
-        } elseif ($journal) { $journal.Status='Failed' }
-        if ($journalPath -and $journal) { try { Write-GoatJournal $journal $journalPath } catch { $rollbackErrors += "Falha ao salvar diário: $($_.Exception.Message)" } }
-        if ($logPath) { try { Write-GoatLog $logPath "FAILED $failure; rollback=$($rollbackErrors -join '; ')" 'ERROR' } catch {} }
-        if ($rollbackErrors.Count -gt 0) { $failure += " Reversão incompleta: $($rollbackErrors -join '; '). Preserve o backup e verifique o log." }
-        return New-GoatResult $false $failure $transactionId $logPath
-    } finally { if ($locked -and $mutex) { $mutex.ReleaseMutex() }; if ($mutex) { $mutex.Dispose() } }
+        if($verified){$session.State='Finalized';$warnings.Add('Finalização interrompida reconciliada com pacote íntegro.')}
+        else{$session.State='Open';$warnings.Add('Finalização interrompida: sessão reaberta para revisão. Arquivos parciais e recuperação preservados.')}
+        Save-GoatSession $session
+    }
+    $session|Add-Member RuntimeWarnings @($warnings.ToArray()) -Force -PassThru
+    }finally{if($loadLocked){$loadMutex.ReleaseMutex()};$loadMutex.Dispose()}
 }
-
-function Assert-GoatJournal {
-    param($Journal)
-    if ($Journal.SchemaVersion -ne 1) { throw 'Formato de backup desconhecido.' }
-    $identity = Get-GoatMachineIdentity
-    if ($Journal.MachineGuid -ne $identity.MachineGuid -or $Journal.UserSid -ne $identity.UserSid) { throw 'Este backup pertence a outro Windows ou outro usuário. Use a mesma identidade da aplicação original.' }
-    $dummyScan = [pscustomobject]@{ IsDemo=$true; OS=[pscustomobject]@{Supported=$true} }
-    $catalog = @(Get-GoatTweaks -Scan $dummyScan)
-    foreach ($step in @($Journal.Steps)) {
-        $allowed = @($catalog | Where-Object { $_.Id -eq $step.Id -and $_.Kind -eq $step.Kind })
-        if ($allowed.Count -ne 1) { throw 'Operação desconhecida no backup.' }
-        if ($step.Kind -eq 'Registry') {
-            $match = @($allowed[0].Targets | Where-Object { $_.Path -eq $step.Original.Path -and $_.Name -eq $step.Original.Name })
-            if ($match.Count -ne 1) { throw 'Chave fora da lista permitida no backup.' }
+function Add-GoatEvent {
+    param($Session,[string]$Kind,[string]$Message)
+    $event=[pscustomobject]@{Utc=[DateTime]::UtcNow.ToString('o');Kind=$Kind;Message=$Message}
+    $bytes=[Text.UTF8Encoding]::new($false).GetBytes(($event|ConvertTo-Json -Compress)+"`r`n")
+    $stream=[IO.File]::Open((Join-Path $Session.Root 'audit.jsonl'),[IO.FileMode]::Append,[IO.FileAccess]::Write,[IO.FileShare]::Read)
+    try{$stream.Write($bytes,0,$bytes.Length);$stream.Flush($true)}finally{$stream.Dispose()}
+    $Session.Events+= $event
+    Save-GoatSession $Session
+}
+function Get-GoatActions {
+    # These are preferences, never advertised as FPS optimizations. Mutation release
+    # is intentionally gated until the documented VM/physical matrix is completed.
+    @(
+        [pscustomobject]@{Id='explorer-show-extensions';Title='Mostrar extensões de arquivos';Path='Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced';Name='HideFileExt';On=0;Off=1;Risk='Baixo / preferência';Reboot=$false;Benefit='Ajuda a identificar tipos de arquivo; FPS não medido.'},
+        [pscustomobject]@{Id='explorer-show-hidden';Title='Mostrar arquivos ocultos';Path='Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced';Name='Hidden';On=1;Off=2;Risk='Baixo / preferência';Reboot=$false;Benefit='Inspeção técnica; arquivos de sistema protegidos permanecem protegidos.'}
+    ) | ForEach-Object {
+        $_ | Add-Member Hive 'CurrentUser' -PassThru | Add-Member View 'Registry64' -PassThru |
+            Add-Member Status 'IMPLEMENTED_NOT_VALIDATED' -PassThru | Add-Member ReleaseEnabled $false -PassThru
+    }
+}
+function Read-GoatRegistry {
+    param($Target)
+    $base=[Microsoft.Win32.RegistryKey]::OpenBaseKey([Microsoft.Win32.RegistryHive]::$($Target.Hive),[Microsoft.Win32.RegistryView]::$($Target.View))
+    try {
+        $key=$base.OpenSubKey([string]$Target.Path,$false)
+        if (-not $key) { return [pscustomobject]@{KeyExists=$false;Exists=$false;Kind=$null;Data=$null} }
+        try {
+            if ($key.GetValueNames() -notcontains [string]$Target.Name) { return [pscustomobject]@{KeyExists=$true;Exists=$false;Kind=$null;Data=$null} }
+            $kind=$key.GetValueKind([string]$Target.Name).ToString()
+            if ($kind -notin @('String','ExpandString','MultiString','Binary','DWord','QWord')) { throw 'Tipo de Registro não suportado.' }
+            $data=$key.GetValue([string]$Target.Name,$null,[Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
+            return [pscustomobject]@{KeyExists=$true;Exists=$true;Kind=$kind;Data=$data}
+        } finally { $key.Dispose() }
+    } finally { $base.Dispose() }
+}
+function Write-GoatRegistry {
+    param($Target,$State)
+    $base=[Microsoft.Win32.RegistryKey]::OpenBaseKey([Microsoft.Win32.RegistryHive]::$($Target.Hive),[Microsoft.Win32.RegistryView]::$($Target.View))
+    try {
+        if (-not $State.Exists) {
+            $key=$base.OpenSubKey([string]$Target.Path,$true)
+            if ($key) { try { $key.DeleteValue([string]$Target.Name,$false); $key.Flush() } finally { $key.Dispose() } }
+            return # Never delete a parent key, even if it did not exist originally.
+        }
+        $key=$base.CreateSubKey([string]$Target.Path)
+        try {
+            $data=switch ([string]$State.Kind) {
+                Binary { [byte[]]@($State.Data) }; MultiString { [string[]]@($State.Data) }
+                DWord { [int]$State.Data }; QWord { [long]$State.Data }
+                String { [string]$State.Data }; ExpandString { [string]$State.Data }
+                default { throw 'Tipo de Registro não suportado.' }
+            }
+            $key.SetValue([string]$Target.Name,$data,[Microsoft.Win32.RegistryValueKind]::$($State.Kind)); $key.Flush()
+        } finally { $key.Dispose() }
+    } finally { $base.Dispose() }
+}
+function Test-GoatStateEqual {
+    param($A,$B)
+    if ([bool]$A.Exists -ne [bool]$B.Exists) { return $false }
+    if (-not $A.Exists) { return $true }
+    if ([string]$A.Kind -cne [string]$B.Kind) { return $false }
+    return (($A.Data | ConvertTo-Json -Compress -Depth 8) -ceq ($B.Data | ConvertTo-Json -Compress -Depth 8))
+}
+function Assert-GoatRegistrySnapshot {
+    param($State)
+    if($null -eq $State -or $State.Exists -isnot [bool] -or $State.KeyExists -isnot [bool]){throw 'Snapshot sem flags de presença válidas.'}
+    if(-not $State.Exists){if($null -ne $State.Kind -or $null -ne $State.Data){throw 'Snapshot ausente contém tipo/dados.'};return}
+    if(-not $State.KeyExists){throw 'Snapshot de valor presente exige chave presente.'}
+    if($State.Kind -notin @('String','ExpandString','MultiString','Binary','DWord','QWord')){throw 'Tipo de snapshot inválido.'}
+    switch([string]$State.Kind){
+        {$_ -in @('String','ExpandString')} {if($State.Data -isnot [string]){throw 'Snapshot textual inválido.'}}
+        'MultiString' {if($State.Data -isnot [array] -or @($State.Data|Where-Object{$_ -isnot [string]}).Count){throw 'Snapshot MultiString inválido.'}}
+        'Binary' {if($State.Data -isnot [array]){throw 'Snapshot binário inválido.'};foreach($byte in $State.Data){if($byte -isnot [ValueType] -or [double]$byte -lt 0 -or [double]$byte -gt 255 -or [double]$byte -ne [Math]::Truncate([double]$byte)){throw 'Byte de snapshot inválido.'}}}
+        {$_ -in @('DWord','QWord')} {if($State.Data -isnot [int] -and $State.Data -isnot [long]){throw 'Snapshot inteiro inválido.'};if($_ -eq 'DWord' -and ([long]$State.Data -lt [int]::MinValue -or [long]$State.Data -gt [int]::MaxValue)){throw 'DWord fora da faixa.'}}
+    }
+}
+function Get-GoatSnapshotHash {
+    param($Step)
+    $canonical=[ordered]@{Id=[string]$Step.Id;Hive=[string]$Step.Target.Hive;View=[string]$Step.Target.View;Path=[string]$Step.Target.Path;Name=[string]$Step.Target.Name;Original=[ordered]@{KeyExists=$Step.Original.KeyExists;Exists=$Step.Original.Exists;Kind=$Step.Original.Kind;Data=$Step.Original.Data};Proposed=[ordered]@{KeyExists=$Step.Proposed.KeyExists;Exists=$Step.Proposed.Exists;Kind=$Step.Proposed.Kind;Data=$Step.Proposed.Data}}
+    $bytes=[Text.Encoding]::UTF8.GetBytes(($canonical|ConvertTo-Json -Depth 16 -Compress));$sha=[Security.Cryptography.SHA256]::Create()
+    try{([BitConverter]::ToString($sha.ComputeHash($bytes))).Replace('-','').ToLowerInvariant()}finally{$sha.Dispose()}
+}
+function Get-GoatTransactions {
+    param($Session)
+    $directory=Join-Path $Session.Root 'transactions'
+    Assert-GoatPlainFilePath $directory
+    if (Test-Path -LiteralPath $directory) {
+        foreach ($file in @(Get-ChildItem -LiteralPath $directory -Filter '*.json' -File -Force | Sort-Object Name)) {
+            Assert-GoatPlainFilePath $file.FullName
+            # A malformed journal must be visible and block changes, never ignored.
+            $value=Get-Content -LiteralPath $file.FullName -Raw -Encoding UTF8 | ConvertFrom-Json -ErrorAction Stop
+            if($value.Id -cne $file.BaseName){throw 'Nome do diário diverge do ID da transação.'}
+            Assert-GoatTransaction $value
+            $value | Add-Member JournalPath $file.FullName -Force | Out-Null
+            $value | Add-Member OwnerSessionId $Session.Id -Force | Out-Null
+            $value | Add-Member OwnerSessionRoot $Session.Root -Force -PassThru
         }
     }
 }
-
-function Restore-GoatLastTransaction {
-    [CmdletBinding()]
-    param([switch]$Demo, [scriptblock]$ProgressCallback)
-    if ($Demo) { return New-GoatResult $true 'DEMONSTRAÇÃO: restauração simulada. Nenhuma configuração foi alterada.' }
-    $mutex=$null; $locked=$false; $logPath=''; $journal=$null; $journalPath=''
+function Get-GoatRelatedTransactions {
+    param($Session,$Identity)
+    # Journals survive a closed UI/new session. Search sibling GOAT session folders
+    # while holding the same mutation mutex, so an interrupted batch stays a gate.
+    $roots=New-Object 'System.Collections.Generic.List[object]'
+    $roots.Add([pscustomobject]@{Id=$Session.Id;Root=[IO.Path]::GetFullPath($Session.Root)})
+    $sessionsRoot=Split-Path ([IO.Path]::GetFullPath($Session.Root)) -Parent
+    $groups=@($sessionsRoot)
+    $groupProperty=$Session.PSObject.Properties['RecoveryGroupRoot']
+    $recoveryRoot=if($groupProperty -and $groupProperty.Value){[IO.Path]::GetFullPath([string]$groupProperty.Value)}else{[IO.Path]::GetFullPath($Session.Root)}
+    if($groupProperty -and $groupProperty.Value){$mainFile=Join-Path $recoveryRoot 'session.json';if([IO.File]::Exists($mainFile)){$main=Get-Content -LiteralPath $mainFile -Raw -Encoding UTF8|ConvertFrom-Json;$roots.Add([pscustomobject]@{Id=$main.Id;Root=$recoveryRoot})}}
+    $embedded=Join-Path $recoveryRoot 'related-sessions';if([IO.Directory]::Exists($embedded)){$groups+=$embedded}
+    foreach($group in $groups){foreach($folder in @(Get-ChildItem -LiteralPath $group -Directory -ErrorAction Stop)) {
+        if($folder.Attributes -band [IO.FileAttributes]::ReparsePoint){throw 'Sessão com redirecionamento de pasta bloqueada.'}
+        $sessionFile=Join-Path $folder.FullName 'session.json'
+        if(-not [IO.File]::Exists($sessionFile)){continue}
+        $owner=Get-Content -LiteralPath $sessionFile -Raw -Encoding UTF8 | ConvertFrom-Json -ErrorAction Stop
+        if($owner.SchemaVersion -ne 1 -or $owner.Id -cne $folder.Name){continue}
+        $roots.Add([pscustomobject]@{Id=$owner.Id;Root=$folder.FullName})
+    }}
+    $seen=New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+    foreach($owner in $roots){if(-not $seen.Add([IO.Path]::GetFullPath($owner.Root))){continue};foreach($transaction in @(Get-GoatTransactions $owner)) {
+        if($transaction.Identity.Machine -eq $Identity.Machine -and $transaction.Identity.Sid -eq $Identity.Sid){$transaction}
+    }}
+}
+function Get-GoatPendingTransactions {
+    param($Session,$Identity)
+    Get-GoatRelatedTransactions $Session $Identity | Where-Object State -in @('Applying','Restoring','RestoreFailed','Prepared')
+}
+function Get-GoatActionPreview {
+    param($Session,[string[]]$Ids,[ValidateSet('On','Off')][string]$Direction='On',[switch]$InspectOnly)
+    if ($Session.State -ne 'Open') { throw 'Sessão encerrada. Abra uma nova sessão.' }
+    $persisted=Get-Content -LiteralPath (Join-Path $Session.Root 'session.json') -Raw -Encoding UTF8|ConvertFrom-Json -ErrorAction Stop
+    if($persisted.Id -cne $Session.Id -or $persisted.State -ne 'Open'){throw 'A sessão persistida foi encerrada ou está em outra operação. Reabra o atendimento antes de continuar.'}
+    if (@($Ids).Count -eq 0 -or @($Ids | Select-Object -Unique).Count -ne @($Ids).Count) { throw 'Seleção vazia ou duplicada.' }
+    foreach ($id in $Ids) {
+        $action=@(Get-GoatActions | Where-Object Id -eq $id)
+        if ($action.Count -ne 1) { throw ('Ação desconhecida: '+$id) }
+        $action=$action[0]
+        $allowed=($Session.Demo -or ($action.ReleaseEnabled -and $action.Status -eq 'IMPLEMENTED_AND_TESTED'))
+        if (-not $allowed -and -not $InspectOnly) { throw 'Ação aguardando validação de bancada. Disponível apenas para simulação.' }
+        $before=if($Session.Demo){[pscustomobject]@{KeyExists=$true;Exists=$false;Kind=$null;Data=$null}}else{Read-GoatRegistry $action}
+        $proposed=[pscustomobject]@{KeyExists=$true;Exists=$true;Kind='DWord';Data=$action.$Direction}
+        [pscustomobject]@{Id=$id;Action=$action;Before=$before;Proposed=$proposed;Direction=$Direction;Changed=(-not (Test-GoatStateEqual $before $proposed));ExecutionAllowed=$allowed;Note=$(if($allowed){'Revise a prévia antes de aplicar.'}else{'Somente leitura; executor aguardando validação de bancada.'})}
+    }
+}
+function Assert-GoatTransaction {
+    param($Transaction,$Identity)
+    if ($Transaction.SchemaVersion -ne 1 -or [string]$Transaction.Id -notmatch '^[a-f0-9]{32}$' -or [string]::IsNullOrWhiteSpace([string]$Transaction.Identity.Machine) -or [string]::IsNullOrWhiteSpace([string]$Transaction.Identity.Sid)) { throw 'Identidade/schema do diário inválido.' }
+    if($null -ne $Identity -and ($Transaction.Identity.Machine -cne $Identity.Machine -or $Transaction.Identity.Sid -cne $Identity.Sid)){throw 'Diário pertence a outro Windows/usuário.'}
+    if($Transaction.State -notin @('Prepared','Applying','Applied','Restoring','Restored','RestoreFailed')){throw 'Estado de transação desconhecido.'}
+    $timestamp=[datetime]::MinValue;if(-not [datetime]::TryParse([string]$Transaction.CreatedUtc,[ref]$timestamp)){throw 'Horário da transação inválido.'}
+    if(@($Transaction.Steps).Count -lt 1 -or @($Transaction.Steps).Count -gt 16 -or @($Transaction.Steps.Id|Select-Object -Unique).Count -ne @($Transaction.Steps).Count){throw 'Etapas ausentes ou duplicadas no diário.'}
+    foreach ($step in @($Transaction.Steps)) {
+        $allowed=@(Get-GoatActions | Where-Object Id -eq $step.Id)
+        if ($allowed.Count -ne 1) { throw 'Diário contém ação não autorizada.' }
+        foreach ($field in @('Hive','View','Path','Name')) {
+            if ([string]$allowed[0].$field -cne [string]$step.Target.$field) { throw 'Alvo do diário diverge do executor.' }
+        }
+        if($step.State -notin @('Prepared','Applying','Applied','Restoring','Restored','RestoreFailed','Unchanged')){throw 'Estado de etapa desconhecido.'}
+        Assert-GoatRegistrySnapshot $step.Original;Assert-GoatRegistrySnapshot $step.Proposed
+        if($step.Proposed.Kind -ne 'DWord' -or -not $step.Proposed.Exists -or $step.Proposed.Data -notin @($allowed[0].On,$allowed[0].Off)){throw 'Pós-condição não pertence ao executor autorizado.'}
+        if([string]$step.SnapshotSha256 -notmatch '^[a-f0-9]{64}$' -or $step.SnapshotSha256 -cne (Get-GoatSnapshotHash $step)){throw 'Hash do snapshot divergiu. Preserve o diário para análise.'}
+        if($step.State -eq 'Unchanged' -and -not (Test-GoatStateEqual $step.Original $step.Proposed)){throw 'Etapa sem mudança diverge do snapshot.'}
+        if($Transaction.State -eq 'Applied' -and $step.State -notin @('Applied','Unchanged')){throw 'Transação aplicada contém etapa não verificada.'}
+        if($Transaction.State -eq 'Prepared' -and $step.State -ne 'Prepared'){throw 'Transação preparada contém estado inconsistente.'}
+        if($Transaction.State -eq 'Restored' -and $step.State -notin @('Restored','Prepared','Unchanged')){throw 'Transação restaurada contém etapa pendente.'}
+    }
+}
+function Undo-GoatTransactionInternal {
+    param($Transaction,[string]$Path)
+    $Transaction.State='Restoring'; Write-GoatJson $Transaction $Path
+    $steps=@($Transaction.Steps); [array]::Reverse($steps)
+    $failures=@()
+    foreach ($step in $steps) {
+        if ($step.State -in @('Applying','Applied','Restoring','RestoreFailed')) {
+            try {
+                $step.State='Restoring'; Write-GoatJson $Transaction $Path
+                Write-GoatRegistry $step.Target $step.Original
+                if (-not (Test-GoatStateEqual (Read-GoatRegistry $step.Target) $step.Original)) { throw 'Leitura após reversão divergiu.' }
+                $step.State='Restored'; $step.Error=$null; Write-GoatJson $Transaction $Path
+            } catch { $step.State='RestoreFailed';$step.Error=$_.Exception.Message;$failures+=$_.Exception.Message;Write-GoatJson $Transaction $Path }
+        }
+    }
+    $Transaction.State=if($failures.Count){'RestoreFailed'}else{'Restored'}
+    Write-GoatJson $Transaction $Path
+    if ($failures.Count) { throw ('Reversão incompleta. Preserve diário: '+($failures -join '; ')) }
+}
+function Invoke-GoatActionBatch {
+    param($Session,[string[]]$Ids,[ValidateSet('On','Off')][string]$Direction='On',[switch]$Consent)
+    if (-not $Consent) { throw 'Consentimento contextual necessário após revisar a prévia.' }
+    $preview=@(Get-GoatActionPreview $Session $Ids $Direction)
+    if ($Session.Demo) {
+        Add-GoatEvent $Session 'DEMO' ('Simulação de '+($Ids -join ', ')+'; nenhuma alteração do Windows.')
+        return [pscustomobject]@{State='DEMO';Steps=$preview;Message='Simulação concluída; nenhuma alteração do Windows.'}
+    }
+    $mutex=[Threading.Mutex]::new($false,'Local\GOAT-Tweaks-Actions')
+    $locked=$false
     try {
-        if (-not (Test-GoatAdministrator)) { throw 'Abra como administrador para restaurar.' }
-        if (-not [Environment]::Is64BitProcess) { throw 'Use o Windows PowerShell de 64 bits.' }
-        $mutex=New-Object System.Threading.Mutex($false,'Global\GOAT-Tweaks-v2.2-Mutation')
-        try { $locked=$mutex.WaitOne(0) } catch [System.Threading.AbandonedMutexException] { $locked=$true }
-        if (-not $locked) { throw 'Outra sessão GOAT está trabalhando.' }
-        $root=Get-GoatStorageRoot
-        $backupRoot=Join-Path $root 'backups'
-        if (-not (Test-Path -LiteralPath $backupRoot)) { throw 'Nenhum backup encontrado neste computador.' }
-        $identity=Get-GoatMachineIdentity
-        $eligible=New-Object 'System.Collections.Generic.List[object]'
-        foreach ($file in @(Get-ChildItem -LiteralPath $backupRoot -Filter '*.json' -File)) {
-            $candidate=Get-Content -LiteralPath $file.FullName -Raw -Encoding UTF8 -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
-            if ($candidate.MachineGuid -eq $identity.MachineGuid -and $candidate.UserSid -eq $identity.UserSid -and $candidate.Status -in @('Applied','Applying','Restoring','RollbackIncomplete')) {
-                $created=[DateTimeOffset]::MinValue
-                if (-not [DateTimeOffset]::TryParse([string]$candidate.CreatedUtc,[Globalization.CultureInfo]::InvariantCulture,[Globalization.DateTimeStyles]::AssumeUniversal,[ref]$created)) {throw 'Data inválida no diário; preserve o backup para revisão.'}
-                $eligible.Add([pscustomobject]@{Journal=$candidate;Path=$file.FullName;CreatedTicks=$created.UtcTicks})
+        try { $locked=$mutex.WaitOne(0) } catch [Threading.AbandonedMutexException] { $locked=$true }
+        if (-not $locked) { throw 'Outra operação GOAT está ativa.' }
+        $identity=Get-GoatIdentity
+        $pending=@(Get-GoatPendingTransactions $Session $identity)
+        if ($pending.Count) { throw 'Recupere a transação interrompida antes de novas ações.' }
+        # Re-read under the resource lock. The preview does not authorize stale state.
+        $preview=@(Get-GoatActionPreview $Session $Ids $Direction)
+        $transaction=[pscustomobject]@{SchemaVersion=1;Id=[guid]::NewGuid().ToString('N');Identity=$identity;CreatedUtc=[DateTime]::UtcNow.ToString('o');State='Prepared';Steps=@()}
+        foreach ($item in $preview) {
+            $step=[pscustomobject]@{Id=$item.Id;Target=($item.Action|ConvertTo-Json -Depth 8|ConvertFrom-Json);Original=($item.Before|ConvertTo-Json -Depth 16|ConvertFrom-Json);Proposed=($item.Proposed|ConvertTo-Json -Depth 16|ConvertFrom-Json);State='Prepared';Error=$null;SnapshotSha256=$null}
+            Assert-GoatRegistrySnapshot $step.Original;Assert-GoatRegistrySnapshot $step.Proposed
+            $step.SnapshotSha256=Get-GoatSnapshotHash $step;$transaction.Steps+=$step
+        }
+        $path=Join-Path $Session.Root ('transactions\'+$transaction.Id+'.json')
+        Write-GoatJson $transaction $path # durable exact snapshot before first write
+        $saved=Get-Content -LiteralPath $path -Raw -Encoding UTF8|ConvertFrom-Json;Assert-GoatTransaction $saved $identity
+        try {
+            $transaction.State='Applying'; Write-GoatJson $transaction $path
+            foreach ($step in $transaction.Steps) {
+                if(Test-GoatStateEqual $step.Original $step.Proposed){$step.State='Unchanged';Write-GoatJson $transaction $path;continue}
+                $step.State='Applying'; Write-GoatJson $transaction $path
+                Write-GoatRegistry $step.Target $step.Proposed
+                if (-not (Test-GoatStateEqual (Read-GoatRegistry $step.Target) $step.Proposed)) { throw 'Verificação após aplicação falhou.' }
+                $step.State='Applied'; Write-GoatJson $transaction $path
+            }
+            $transaction.State='Applied'; Write-GoatJson $transaction $path
+            Add-GoatEvent $Session 'Applied' ('Transação verificada '+$transaction.Id)
+            return $transaction
+        } catch {
+            $failure=$_.Exception.Message
+            Undo-GoatTransactionInternal $transaction $path
+            throw ('Aplicação falhou e foi revertida: '+$failure)
+        }
+    } finally { if($locked){$mutex.ReleaseMutex()};$mutex.Dispose() }
+}
+function Restore-GoatTransaction {
+    param($Session,[string]$TransactionId,[switch]$Consent)
+    if (-not $Consent) { throw 'Confirme a restauração da transação selecionada.' }
+    if ($Session.Demo) { return [pscustomobject]@{State='DEMO';Message='Restauração simulada; nenhuma alteração.'} }
+    $mutex=[Threading.Mutex]::new($false,'Local\GOAT-Tweaks-Actions');$locked=$false
+    try {
+        try{$locked=$mutex.WaitOne(0)}catch [Threading.AbandonedMutexException]{$locked=$true}
+        if(-not $locked){throw 'Outra operação GOAT está ativa.'}
+        $all=@(Get-GoatTransactions $Session)
+        $transaction=@($all | Where-Object Id -eq $TransactionId)
+        if($transaction.Count -ne 1){throw 'Transação não encontrada.'}
+        $transaction=$transaction[0]
+        Assert-GoatTransaction $transaction (Get-GoatIdentity)
+        if($transaction.State -eq 'Restored'){return $transaction}
+        $later=@(Get-GoatRelatedTransactions $Session (Get-GoatIdentity) | Where-Object { $_.CreatedUtc -gt $transaction.CreatedUtc -and $_.State -ne 'Restored' })
+        if($later.Count){throw 'Restaure primeiro a transação mais recente para preservar a ordem dos valores.'}
+        if($transaction.State -eq 'Applied'){
+            foreach($step in $transaction.Steps){
+                if($step.State -eq 'Unchanged'){continue}
+                $current=Read-GoatRegistry $step.Target
+                if(-not (Test-GoatStateEqual $current $step.Proposed) -and -not (Test-GoatStateEqual $current $step.Original)){throw 'Estado atual diverge do valor aplicado e do original; revisão manual necessária antes da restauração.'}
             }
         }
-        $latest=@($eligible.ToArray()|Sort-Object CreatedTicks -Descending|Select-Object -First 1)
-        if ($latest.Count -eq 1) {$journal=$latest[0].Journal;$journalPath=$latest[0].Path}
-        if (-not $journal) { throw 'Nenhuma transação aplicada ou interrompida para restaurar neste Windows/usuário.' }
-        Assert-GoatJournal $journal
-        $logPath=Join-Path $root "logs\$($journal.Id)-restore.log"
-        Write-GoatLog $logPath "RESTORE BEGIN $($journal.Id)"
-        # The original verified restore point protects this same transaction and its undo.
-        # Reuse it to keep recovery available inside Windows' 24-hour creation limit.
-        $points=@(Get-CimInstance -Namespace 'root/default' -ClassName SystemRestore -OperationTimeoutSec 20 -ErrorAction Stop)
-        $protected=@($points | Where-Object { [long]$_.SequenceNumber -eq [long]$journal.RestorePoint -and $_.Description -eq "GOAT v2.2 $($journal.Id)" })
-        if ($protected.Count -eq 0) {
-            Send-GoatProgress $ProgressCallback 'Verificando novo ponto de proteção para a restauração...'
-            $journal.RestorePoint=New-GoatRestorePoint $journal.Id $logPath
-        }
-        $journal.Status='Restoring'; Write-GoatJournal $journal $journalPath
-        $reverse=@($journal.Steps); [Array]::Reverse($reverse)
-        $errors=@(); $restored=0
-        foreach ($step in $reverse) {
-            if ($step.Status -in @('Applied','Applying','Restoring')) {
-                try {
-                    $step.Status='Restoring'; Write-GoatJournal $journal $journalPath
-                    Send-GoatProgress $ProgressCallback "Restaurando $($step.Id)..."
-                    Set-GoatStepValue $step $step.Original $logPath
-                    $step.Status='Restored'; $restored++
-                    Write-GoatJournal $journal $journalPath
-                } catch { $errors += $_.Exception.Message }
-            }
-        }
-        if ($errors.Count -gt 0) { $journal.Status='RollbackIncomplete'; Write-GoatJournal $journal $journalPath; throw ($errors -join '; ') }
-        $journal.Status='Restored'; Write-GoatJournal $journal $journalPath
-        Write-GoatLog $logPath 'RESTORE COMMIT'
-        return New-GoatResult $true "Configuração anterior restaurada ($restored valores/ações). Reinicie ou entre novamente na sessão para concluir preferências visuais." $journal.Id $logPath
-    } catch {
-        $message=$_.Exception.Message
-        if ($logPath) { try { Write-GoatLog $logPath $message 'ERROR' } catch {} }
-        $id=''; if ($journal) {$id=$journal.Id}
-        return New-GoatResult $false $message $id $logPath
-    } finally { if ($locked -and $mutex) {$mutex.ReleaseMutex()}; if ($mutex) {$mutex.Dispose()} }
+        Undo-GoatTransactionInternal $transaction $transaction.JournalPath
+        Add-GoatEvent $Session 'Restored' ('Restaurada '+$TransactionId)
+        return $transaction
+    } finally { if($locked){$mutex.ReleaseMutex()};$mutex.Dispose() }
 }

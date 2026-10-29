@@ -1,68 +1,71 @@
 ﻿#Requires -Version 5.1
 [CmdletBinding()]
 param([string]$ProjectRoot)
-
 $ErrorActionPreference='Stop'
-if (-not $ProjectRoot) { $ProjectRoot=Split-Path $PSScriptRoot -Parent }
-$outputRoot = Join-Path $ProjectRoot 'dist'
-[IO.Directory]::CreateDirectory($outputRoot) | Out-Null
-$parts = New-Object System.Collections.Generic.List[string]
-$parts.Add('#Requires -Version 5.1')
-$parts.Add('[CmdletBinding()]')
-$parts.Add('param([switch]$Demo, [switch]$ScanOnly)')
-$parts.Add('$script:GoatRoot = $PSScriptRoot')
-$parts.Add('$script:GoatLaunchPath = $PSCommandPath')
-foreach ($source in @(
-    @{Name='GoatCoreSource';File='src\Core.ps1'},
-    @{Name='GoatScannerSource';File='src\Scanner.ps1'},
-    @{Name='GoatAdvancedScannerSource';File='src\AdvancedScanner.ps1'},
-    @{Name='GoatRecommendationSource';File='src\Recommendations.ps1'},
-    @{Name='GoatRecommendationJson';File='data\recommendations.json'},
-    @{Name='GoatSelectionSource';File='src\Selection.ps1'},
-    @{Name='GoatToolAdvisorSource';File='src\ToolAdvisor.ps1'},
-    @{Name='GoatNativeOptionsJson';File='data\native-options.json'},
-    @{Name='GoatToolRulesJson';File='data\tool-rules.json'},
-    @{Name='GoatIntegrationSource';File='src\Integrations.ps1'},
-    @{Name='GoatUiSource';File='src\UI.ps1'},
-    @{Name='GoatXaml';File='src\UI.xaml'}
-)) {
-    $content=Get-Content -LiteralPath (Join-Path $ProjectRoot $source.File) -Raw -Encoding UTF8
-    # Raw GitHub responses have no guaranteed charset. Keep the transport ASCII
-    # and decode UTF-8 resources explicitly so Windows PowerShell 5.1 preserves
-    # Portuguese text both in saved scripts and in irm | iex. Sources stay in src/.
-    $encoded=[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($content))
-    $parts.Add(('$script:{0} = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String(' -f $source.Name) + "'" + $encoded + "'))")
+if(-not $ProjectRoot){$ProjectRoot=Split-Path $PSScriptRoot -Parent}
+$root=[IO.Path]::GetFullPath($ProjectRoot);$dist=Join-Path $root 'dist';[void][IO.Directory]::CreateDirectory($dist)
+$version=(Get-Content -LiteralPath (Join-Path $root 'VERSION') -Raw -Encoding UTF8).Trim()
+if($version -notmatch '^\d+\.\d+\.\d+$'){throw 'VERSION precisa conter uma versao oficial SemVer.'}
+$utf8=[Text.UTF8Encoding]::new($false)
+function ConvertTo-GoatPackedResource([string]$Content){
+    $memory=[IO.MemoryStream]::new();$gzip=[IO.Compression.GZipStream]::new($memory,[IO.Compression.CompressionMode]::Compress,$true)
+    try{$bytes=[Text.Encoding]::UTF8.GetBytes($Content);$gzip.Write($bytes,0,$bytes.Length)}finally{$gzip.Dispose()}
+    $result=[Convert]::ToBase64String($memory.ToArray());$memory.Dispose();return $result
 }
-$catalogBytes=[Text.Encoding]::UTF8.GetBytes((Get-Content -LiteralPath (Join-Path $ProjectRoot 'data\repositories.json') -Raw -Encoding UTF8))
-$catalogMemory=New-Object IO.MemoryStream
-$catalogGzip=New-Object IO.Compression.GZipStream($catalogMemory,[IO.Compression.CompressionMode]::Compress,$true)
-try { $catalogGzip.Write($catalogBytes,0,$catalogBytes.Length) } finally { $catalogGzip.Dispose() }
-$catalogEncoded=[Convert]::ToBase64String($catalogMemory.ToArray()); $catalogMemory.Dispose()
-$parts.Add('$goatCatalogStream = [IO.MemoryStream]::new([Convert]::FromBase64String('''+$catalogEncoded+'''))')
-$parts.Add('$goatCatalogReader = [IO.StreamReader]::new([IO.Compression.GZipStream]::new($goatCatalogStream,[IO.Compression.CompressionMode]::Decompress),[Text.Encoding]::UTF8)')
-$parts.Add('try { $script:GoatCatalogJson = $goatCatalogReader.ReadToEnd() } finally { $goatCatalogReader.Dispose(); $goatCatalogStream.Dispose() }')
-$logoEncoded=[Convert]::ToBase64String([IO.File]::ReadAllBytes((Join-Path $ProjectRoot 'assets\goat-logo.png')))
-$parts.Add('$script:GoatLogoBase64 = '''+$logoEncoded+'''')
-$entry=Get-Content -LiteralPath (Join-Path $ProjectRoot 'src\Entry.ps1') -Raw -Encoding UTF8
-$entryEncoded=[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($entry))
-$parts.Add(". ([scriptblock]::Create([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('" + $entryEncoded + "'))))")
-$bundle = Join-Path $outputRoot 'GOAT-Tweaks.ps1'
-[IO.File]::WriteAllText($bundle, ($parts -join "`r`n`r`n"), [Text.Encoding]::ASCII)
-if (@([IO.File]::ReadAllBytes($bundle) | Where-Object { $_ -gt 127 }).Count -gt 0) { throw 'Bundle precisa ser ASCII sem BOM para execucao remota.' }
-$parseErrors=$null; $tokens=$null
-[Management.Automation.Language.Parser]::ParseFile($bundle,[ref]$tokens,[ref]$parseErrors) | Out-Null
-if ($parseErrors.Count -gt 0) { throw ($parseErrors | Out-String) }
+$parts=[Collections.Generic.List[string]]::new()
+$parts.Add(@'
+#Requires -Version 5.1
+# GOAT Tweaks __VERSION__. Original application built from the supplied specification.
+# Self-contained, offline resources. No network bootstrap and no automatic tweaks.
+[CmdletBinding()]
+param([switch]$Demo,[switch]$ScanOnly,[string]$DataRoot,[string]$SessionPath)
+$script:GoatLaunchPath=$PSCommandPath
+$script:GoatVersion='__VERSION__'
+function Read-GoatPackedResource([string]$Value){
+    $memory=[IO.MemoryStream]::new([Convert]::FromBase64String($Value))
+    $gzip=[IO.Compression.GZipStream]::new($memory,[IO.Compression.CompressionMode]::Decompress)
+    $reader=[IO.StreamReader]::new($gzip,[Text.Encoding]::UTF8)
+    try{$reader.ReadToEnd()}finally{$reader.Dispose();$gzip.Dispose();$memory.Dispose()}
+}
+$script:GoatSources=@{}
+'@.Replace('__VERSION__',$version))
+$manifest=@()
+foreach($name in @('Core','Gpu','Inventory','Benchmark','Reports','Presentation','App')){
+    $file=Join-Path $root ('src\'+$name+'.ps1');$source=Get-Content -LiteralPath $file -Raw -Encoding UTF8
+    $errors=$null;$tokens=$null;[void][Management.Automation.Language.Parser]::ParseInput($source,[ref]$tokens,[ref]$errors)
+    if($errors.Count){throw ($errors|Out-String)}
+    $parts.Add("`$script:GoatSources['$name']=Read-GoatPackedResource '"+(ConvertTo-GoatPackedResource $source)+"'")
+    $manifest+=[pscustomobject]@{Path='src/'+$name+'.ps1';Sha256=(Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash}
+}
+foreach($resource in @(@{Name='GoatXaml';Path='src/UI.xaml'},@{Name='GoatCatalogJson';Path='data/catalog.json'},@{Name='GoatDocumentsJson';Path='data/documents.json'})){
+    $file=Join-Path $root $resource.Path;$content=Get-Content -LiteralPath $file -Raw -Encoding UTF8
+    $parts.Add('$script:'+$resource.Name+"=Read-GoatPackedResource '"+(ConvertTo-GoatPackedResource $content)+"'")
+    $manifest+=[pscustomobject]@{Path=$resource.Path;Sha256=(Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash}
+}
+$entry=Get-Content -LiteralPath (Join-Path $root 'src/Entry.ps1') -Raw -Encoding UTF8
+$parts.Add(". ([scriptblock]::Create((Read-GoatPackedResource '"+(ConvertTo-GoatPackedResource $entry)+"')))")
+$bundle=Join-Path $dist 'GOAT-Tweaks.ps1';[IO.File]::WriteAllText($bundle,($parts -join "`r`n`r`n"),[Text.Encoding]::ASCII)
+$errors=$null;$tokens=$null;[void][Management.Automation.Language.Parser]::ParseFile($bundle,[ref]$tokens,[ref]$errors)
+if($errors.Count){throw ($errors|Out-String)}
 $hash=(Get-FileHash -LiteralPath $bundle -Algorithm SHA256).Hash.ToLowerInvariant()
-[IO.File]::WriteAllText((Join-Path $outputRoot 'GOAT-Tweaks.sha256'), "$hash  GOAT-Tweaks.ps1`r`n", (New-Object Text.UTF8Encoding($false)))
-$zip=Join-Path $outputRoot 'GOAT-Tweaks-v2.4.zip'
-$packageRoot=Join-Path $outputRoot 'package'
-$packageDocs=Join-Path $packageRoot 'docs'
-[IO.Directory]::CreateDirectory($packageDocs) | Out-Null
-Copy-Item -LiteralPath $bundle -Destination $packageRoot -Force
-Copy-Item -LiteralPath (Join-Path $ProjectRoot 'README.md') -Destination $packageRoot -Force
-Copy-Item -LiteralPath (Join-Path $outputRoot 'GOAT-Tweaks.sha256') -Destination $packageRoot -Force
-foreach ($document in @('REFERENCIAS.md','VALIDACAO.md','RECOMENDACOES.md','INTEGRACOES-WINUTIL-RYTUNEX.md','OPCOES.md')) { Copy-Item -LiteralPath (Join-Path $ProjectRoot "docs\$document") -Destination $packageDocs -Force }
-Compress-Archive -LiteralPath @((Join-Path $packageRoot 'GOAT-Tweaks.ps1'),(Join-Path $packageRoot 'README.md'),$packageDocs,(Join-Path $packageRoot 'GOAT-Tweaks.sha256')) -DestinationPath $zip -Force
-Write-Output "Build concluído: $bundle"
-Write-Output "SHA256: $hash"
-Write-Output "Pacote: $zip"
+[IO.File]::WriteAllText((Join-Path $dist 'GOAT-Tweaks.sha256'),$hash+'  GOAT-Tweaks.ps1'+"`r`n",$utf8)
+$manifest+=[pscustomobject]@{Path='src/Entry.ps1';Sha256=(Get-FileHash -LiteralPath (Join-Path $root 'src/Entry.ps1') -Algorithm SHA256).Hash}
+foreach($supportFile in @('VERSION','scripts/Build.ps1','scripts/New-LaunchCommand.ps1')){$manifest+=[pscustomobject]@{Path=$supportFile;Sha256=(Get-FileHash -LiteralPath (Join-Path $root $supportFile) -Algorithm SHA256).Hash}}
+[IO.File]::WriteAllText((Join-Path $dist 'build-manifest.json'),([pscustomobject]@{Version=$version;Channel='Official';BundleSha256=$hash;Sources=$manifest}|ConvertTo-Json -Depth 6),$utf8)
+. (Join-Path $root 'scripts/New-LaunchCommand.ps1')
+$command=Get-GoatLaunchCommand -Version $version -Sha256 $hash
+[IO.File]::WriteAllText((Join-Path $dist 'Open-GOAT.txt'),$command+"`r`n",$utf8)
+$launch=[pscustomobject]@{Version=$version;Sha256=$hash;DownloadUrl=('https://github.com/JuliozXz/GOAT-Tweaks-V1/releases/download/v'+$version+'/GOAT-Tweaks.ps1');Command=$command;DemoCommand=(Get-GoatLaunchCommand -Version $version -Sha256 $hash -Demo);ScanCommand=(Get-GoatLaunchCommand -Version $version -Sha256 $hash -Demo -ScanOnly)}
+[IO.File]::WriteAllText((Join-Path $dist 'launch.json'),($launch|ConvertTo-Json -Depth 4),$utf8)
+$packageRoot=Join-Path $dist ('package/'+[guid]::NewGuid().ToString('N'));[void][IO.Directory]::CreateDirectory($packageRoot)
+$files=@()
+foreach($file in @($bundle,(Join-Path $dist 'GOAT-Tweaks.sha256'),(Join-Path $dist 'build-manifest.json'),(Join-Path $dist 'Open-GOAT.txt'),(Join-Path $dist 'launch.json'),(Join-Path $root 'README.md'),(Join-Path $root 'VERSION'))){$target=Join-Path $packageRoot ([IO.Path]::GetFileName($file));Copy-Item -LiteralPath $file -Destination $target -Force;$files+=$target}
+Copy-Item -LiteralPath (Join-Path $root 'docs') -Destination $packageRoot -Recurse -Force
+$files+=Join-Path $packageRoot 'docs'
+Add-Type -AssemblyName System.IO.Compression,System.IO.Compression.FileSystem
+$zipPath=Join-Path $dist ('GOAT-Tweaks-'+$version+'.zip')
+$zipStream=[IO.File]::Open($zipPath,[IO.FileMode]::Create,[IO.FileAccess]::ReadWrite,[IO.FileShare]::None)
+$archive=[IO.Compression.ZipArchive]::new($zipStream,[IO.Compression.ZipArchiveMode]::Create,$false)
+try{foreach($file in @(Get-ChildItem -LiteralPath $packageRoot -Recurse -File)){$entry=$file.FullName.Substring($packageRoot.Length+1).Replace('\','/');[void][IO.Compression.ZipFileExtensions]::CreateEntryFromFile($archive,$file.FullName,$entry,[IO.Compression.CompressionLevel]::Optimal)}}finally{$archive.Dispose();$zipStream.Dispose()}
+$catalogData=Get-Content (Join-Path $root 'data/catalog.json') -Raw -Encoding UTF8|ConvertFrom-Json
+[pscustomobject]@{Version=$version;Bundle=$bundle;Sha256=$hash;CatalogRecords=$catalogData.record_count;Package=(Join-Path $dist ('GOAT-Tweaks-'+$version+'.zip'));LaunchCommand=(Join-Path $dist 'Open-GOAT.txt')}

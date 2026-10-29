@@ -1,21 +1,13 @@
 ﻿#Requires -Version 5.1
 [CmdletBinding()]
-param([switch]$Demo, [switch]$ScanOnly)
-
-$script:GoatRoot = $PSScriptRoot
-$script:GoatLaunchPath = $PSCommandPath
-$script:GoatScannerSource = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'src\Scanner.ps1') -Raw -Encoding UTF8
-$script:GoatAdvancedScannerSource = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'src\AdvancedScanner.ps1') -Raw -Encoding UTF8
-$script:GoatRecommendationSource = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'src\Recommendations.ps1') -Raw -Encoding UTF8
-$script:GoatRecommendationJson = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'data\recommendations.json') -Raw -Encoding UTF8
-$script:GoatSelectionSource = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'src\Selection.ps1') -Raw -Encoding UTF8
-$script:GoatToolAdvisorSource = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'src\ToolAdvisor.ps1') -Raw -Encoding UTF8
-$script:GoatNativeOptionsJson = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'data\native-options.json') -Raw -Encoding UTF8
-$script:GoatToolRulesJson = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'data\tool-rules.json') -Raw -Encoding UTF8
-$script:GoatCoreSource = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'src\Core.ps1') -Raw -Encoding UTF8
-$script:GoatUiSource = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'src\UI.ps1') -Raw -Encoding UTF8
-$script:GoatXaml = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'src\UI.xaml') -Raw -Encoding UTF8
-$script:GoatIntegrationSource = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'src\Integrations.ps1') -Raw -Encoding UTF8
-$script:GoatCatalogJson = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'data\repositories.json') -Raw -Encoding UTF8
-$script:GoatLogoBase64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes((Join-Path $PSScriptRoot 'assets\goat-logo.png')))
+param([switch]$Demo,[switch]$ScanOnly,[string]$DataRoot,[string]$SessionPath)
+$script:GoatLaunchPath=$PSCommandPath
+$script:GoatVersion=(Get-Content -LiteralPath (Join-Path $PSScriptRoot 'VERSION') -Raw -Encoding UTF8).Trim()
+$script:GoatSources=@{}
+foreach($name in @('Core','Gpu','Inventory','Benchmark','Reports','Presentation','App')){
+    $script:GoatSources[$name]=Get-Content -LiteralPath (Join-Path $PSScriptRoot ('src\'+$name+'.ps1')) -Raw -Encoding UTF8
+}
+$script:GoatXaml=Get-Content -LiteralPath (Join-Path $PSScriptRoot 'src\UI.xaml') -Raw -Encoding UTF8
+$script:GoatCatalogJson=Get-Content -LiteralPath (Join-Path $PSScriptRoot 'data\catalog.json') -Raw -Encoding UTF8
+$script:GoatDocumentsJson=Get-Content -LiteralPath (Join-Path $PSScriptRoot 'data\documents.json') -Raw -Encoding UTF8
 . (Join-Path $PSScriptRoot 'src\Entry.ps1')

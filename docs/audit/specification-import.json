@@ -1,0 +1,1065 @@
+{
+    "schema_version":  "1.0.0",
+    "generated_utc":  "2026-10-29T00:24:39.3362121Z",
+    "read_method":  "Every source file read completely; every JSON scalar traversed and every CSV cell parsed. No source command executed.",
+    "source_manifest_sha256":  "17809d900e5e6f8e099b53696c938bb85baacde67b6372c66d7facad1c24369c",
+    "source_files_read":  83,
+    "json_files":  18,
+    "csv_files":  1,
+    "json_scalar_leaves_read":  22882,
+    "integrity_passed":  81,
+    "integrity_failed":  0,
+    "counts":  {
+                   "historical_settings":  180,
+                   "historical_topics":  153,
+                   "central_settings":  246,
+                   "central_repeated_new_controls":  66,
+                   "central_repeated_new_controls_already_in_settings":  66,
+                   "v73_complements_actual":  73,
+                   "v73_scope_note_claims_66_but_actual_is_73":  true,
+                   "gpu_center":  25,
+                   "unique_active_catalog_ids":  344,
+                   "embedded_documents":  64
+               },
+    "states":  [
+                   {
+                       "status":  "SPEC_ONLY_NOT_YET_VERIFIED",
+                       "count":  344
+                   }
+               ],
+    "execution_classes":  [
+                              {
+                                  "class":  "C_MANUAL",
+                                  "count":  216
+                              },
+                              {
+                                  "class":  "X_BLOCKED",
+                                  "count":  50
+                              },
+                              {
+                                  "class":  "A_AUTO_SAFE",
+                                  "count":  31
+                              },
+                              {
+                                  "class":  "B_APPROVAL",
+                                  "count":  37
+                              },
+                              {
+                                  "class":  "D_LAB_ONLY",
+                                  "count":  10
+                              }
+                          ],
+    "explicitly_blocked":  [
+                               "WIN-EXPERIMENTAL",
+                               "WIN-HUNG",
+                               "CPU-SMT",
+                               "CPU-CSTATES",
+                               "PWR-MODERN",
+                               "PWR-SLEEPSTUDY",
+                               "MEM-COMPRESSION",
+                               "MEM-STANDBY",
+                               "MEM-RAM-ERROR",
+                               "MEM-SVCHOST",
+                               "STOR-NVME-DRIVER",
+                               "STOR-IOLATENCY",
+                               "GPU-NV-HDCP",
+                               "GPU-NV-DMA",
+                               "GPU-NV-THERMAL",
+                               "GPU-AMD-POWERGATE",
+                               "GPU-AMD-SPREAD",
+                               "GPU-INTEL-ENERGY",
+                               "GPU-DMA",
+                               "NET-NAGLE",
+                               "NET-NODELAY",
+                               "NET-IPV6",
+                               "NET-NEIGHBOR",
+                               "NET-QOS-RESERVED",
+                               "TIMER-BCDEDIT",
+                               "TIMER-HPET",
+                               "SEC-DEFENDER",
+                               "SEC-FIREWALL",
+                               "SEC-DMA",
+                               "SEC-BOOT",
+                               "TOOL-ISLC",
+                               "WIN-POWERTHROTTLE",
+                               "WIN-MMCSS",
+                               "WIN-DATA-HOSTS",
+                               "WIN-INVENTORY",
+                               "GPU-VSYNCIDLE",
+                               "GPU-INTEL-ENERGY-BLOCK",
+                               "DISK-004",
+                               "SEC-001",
+                               "SEC-002",
+                               "SEC-003"
+                           ],
+    "original_explicitly_blocked":  [
+                                        "WIN-EXPERIMENTAL",
+                                        "WIN-HUNG",
+                                        "CPU-SMT",
+                                        "CPU-CSTATES",
+                                        "PWR-MODERN",
+                                        "PWR-SLEEPSTUDY",
+                                        "MEM-COMPRESSION",
+                                        "MEM-STANDBY",
+                                        "MEM-RAM-ERROR",
+                                        "MEM-SVCHOST",
+                                        "STOR-NVME-DRIVER",
+                                        "STOR-IOLATENCY",
+                                        "GPU-NV-HDCP",
+                                        "GPU-NV-DMA",
+                                        "GPU-NV-THERMAL",
+                                        "GPU-AMD-POWERGATE",
+                                        "GPU-AMD-SPREAD",
+                                        "GPU-INTEL-ENERGY",
+                                        "GPU-DMA",
+                                        "NET-NAGLE",
+                                        "NET-NODELAY",
+                                        "NET-IPV6",
+                                        "NET-NEIGHBOR",
+                                        "NET-QOS-RESERVED",
+                                        "TIMER-BCDEDIT",
+                                        "TIMER-HPET",
+                                        "SEC-DEFENDER",
+                                        "SEC-FIREWALL",
+                                        "SEC-DMA",
+                                        "SEC-BOOT",
+                                        "TOOL-ISLC",
+                                        "WIN-POWERTHROTTLE",
+                                        "WIN-MMCSS",
+                                        "WIN-DATA-HOSTS",
+                                        "WIN-INVENTORY",
+                                        "GPU-VSYNCIDLE",
+                                        "GPU-INTEL-ENERGY-BLOCK",
+                                        "DISK-004",
+                                        "SEC-001",
+                                        "SEC-002",
+                                        "SEC-003"
+                                    ],
+    "effective_blocked":  [
+                              "WIN-EXPERIMENTAL",
+                              "WIN-HUNG",
+                              "CPU-SMT",
+                              "CPU-CSTATES",
+                              "CPU-PBO-OC",
+                              "PWR-MODERN",
+                              "PWR-SLEEPSTUDY",
+                              "MEM-COMPRESSION",
+                              "MEM-STANDBY",
+                              "MEM-RAM-ERROR",
+                              "MEM-SVCHOST",
+                              "STOR-SSD-FIRMWARE",
+                              "STOR-NVME-DRIVER",
+                              "STOR-IOLATENCY",
+                              "GPU-NV-HDCP",
+                              "GPU-NV-DMA",
+                              "GPU-NV-THERMAL",
+                              "GPU-NV-PERFLIMIT",
+                              "GPU-AMD-POWERGATE",
+                              "GPU-AMD-SPREAD",
+                              "GPU-INTEL-ENERGY",
+                              "GPU-OC-UV",
+                              "GPU-DMA",
+                              "NET-NAGLE",
+                              "NET-NODELAY",
+                              "NET-IPV6",
+                              "NET-NEIGHBOR",
+                              "NET-QOS-RESERVED",
+                              "TIMER-BCDEDIT",
+                              "TIMER-HPET",
+                              "INPUT-FIRMWARE",
+                              "MSI-MODE",
+                              "SEC-HVCI",
+                              "SEC-DEFENDER",
+                              "SEC-FIREWALL",
+                              "SEC-DMA",
+                              "SEC-BOOT",
+                              "TOOL-ISLC",
+                              "WIN-POWERTHROTTLE",
+                              "WIN-MMCSS",
+                              "WIN-DATA-HOSTS",
+                              "WIN-INVENTORY",
+                              "GPU-VSYNCIDLE",
+                              "GPU-INTEL-ENERGY-BLOCK",
+                              "GPU-003",
+                              "GPU-004",
+                              "DISK-004",
+                              "SEC-001",
+                              "SEC-002",
+                              "SEC-003"
+                          ],
+    "normative_overrides":  [
+                                {
+                                    "id":  "CPU-PBO-OC",
+                                    "source_execution_class":  "C_MANUAL",
+                                    "execution_class":  "X_BLOCKED",
+                                    "normative_reason":  "OC/undervolt de CPU e alteracao de tensao estao fora dos executores permitidos.",
+                                    "normative_source":  [
+                                                             "10_MODO_AVANCADO_SEGURO/01_MATRIZ_POLITICAS_AVANCADAS_SEGURAS.json",
+                                                             "04_PROMPT_PARA_IA/PROMPT_ATIVO_GOAT_TWEAKS.txt"
+                                                         ],
+                                    "normative_source_sha256":  [
+                                                                    "00866211cadf8a24270c81af39b1f78c4b7b53fca9ccc37d2f1b7e2e9917d5df",
+                                                                    "7b3d1230a174bb4bcc307a39ca570537582377af49e55a1ba1e5c4f58f739d52"
+                                                                ]
+                                },
+                                {
+                                    "id":  "STOR-SSD-FIRMWARE",
+                                    "source_execution_class":  "C_MANUAL",
+                                    "execution_class":  "X_BLOCKED",
+                                    "normative_reason":  "Escrita/flash de firmware nao possui executor permitido nem reversao honesta neste app.",
+                                    "normative_source":  [
+                                                             "10_MODO_AVANCADO_SEGURO/01_MATRIZ_POLITICAS_AVANCADAS_SEGURAS.json",
+                                                             "04_PROMPT_PARA_IA/PROMPT_ATIVO_GOAT_TWEAKS.txt"
+                                                         ],
+                                    "normative_source_sha256":  [
+                                                                    "00866211cadf8a24270c81af39b1f78c4b7b53fca9ccc37d2f1b7e2e9917d5df",
+                                                                    "7b3d1230a174bb4bcc307a39ca570537582377af49e55a1ba1e5c4f58f739d52"
+                                                                ]
+                                },
+                                {
+                                    "id":  "GPU-NV-PERFLIMIT",
+                                    "source_execution_class":  "C_MANUAL",
+                                    "execution_class":  "X_BLOCKED",
+                                    "normative_reason":  "O registro mistura diagnostico PerfCap com alteracao de power limit/OC; escrita do slider fica bloqueada, e o texto original de diagnostico permanece preservado.",
+                                    "normative_source":  [
+                                                             "10_MODO_AVANCADO_SEGURO/01_MATRIZ_POLITICAS_AVANCADAS_SEGURAS.json",
+                                                             "04_PROMPT_PARA_IA/PROMPT_ATIVO_GOAT_TWEAKS.txt"
+                                                         ],
+                                    "normative_source_sha256":  [
+                                                                    "00866211cadf8a24270c81af39b1f78c4b7b53fca9ccc37d2f1b7e2e9917d5df",
+                                                                    "7b3d1230a174bb4bcc307a39ca570537582377af49e55a1ba1e5c4f58f739d52"
+                                                                ]
+                                },
+                                {
+                                    "id":  "GPU-OC-UV",
+                                    "source_execution_class":  "C_MANUAL",
+                                    "execution_class":  "X_BLOCKED",
+                                    "normative_reason":  "OC/undervolt de GPU estao proibidos pelo contrato atual do GPU Center.",
+                                    "normative_source":  [
+                                                             "10_MODO_AVANCADO_SEGURO/01_MATRIZ_POLITICAS_AVANCADAS_SEGURAS.json",
+                                                             "04_PROMPT_PARA_IA/PROMPT_ATIVO_GOAT_TWEAKS.txt"
+                                                         ],
+                                    "normative_source_sha256":  [
+                                                                    "00866211cadf8a24270c81af39b1f78c4b7b53fca9ccc37d2f1b7e2e9917d5df",
+                                                                    "7b3d1230a174bb4bcc307a39ca570537582377af49e55a1ba1e5c4f58f739d52"
+                                                                ]
+                                },
+                                {
+                                    "id":  "INPUT-FIRMWARE",
+                                    "source_execution_class":  "C_MANUAL",
+                                    "execution_class":  "X_BLOCKED",
+                                    "normative_reason":  "Escrita/flash de firmware nao possui executor permitido neste app.",
+                                    "normative_source":  [
+                                                             "10_MODO_AVANCADO_SEGURO/01_MATRIZ_POLITICAS_AVANCADAS_SEGURAS.json",
+                                                             "04_PROMPT_PARA_IA/PROMPT_ATIVO_GOAT_TWEAKS.txt"
+                                                         ],
+                                    "normative_source_sha256":  [
+                                                                    "00866211cadf8a24270c81af39b1f78c4b7b53fca9ccc37d2f1b7e2e9917d5df",
+                                                                    "7b3d1230a174bb4bcc307a39ca570537582377af49e55a1ba1e5c4f58f739d52"
+                                                                ]
+                                },
+                                {
+                                    "id":  "MSI-MODE",
+                                    "source_execution_class":  "C_MANUAL",
+                                    "execution_class":  "X_BLOCKED",
+                                    "normative_reason":  "Alteracoes MSI/IRQ estao bloqueadas pelo contrato atual; inventario nao autoriza escrita.",
+                                    "normative_source":  [
+                                                             "10_MODO_AVANCADO_SEGURO/01_MATRIZ_POLITICAS_AVANCADAS_SEGURAS.json",
+                                                             "04_PROMPT_PARA_IA/PROMPT_ATIVO_GOAT_TWEAKS.txt"
+                                                         ],
+                                    "normative_source_sha256":  [
+                                                                    "00866211cadf8a24270c81af39b1f78c4b7b53fca9ccc37d2f1b7e2e9917d5df",
+                                                                    "7b3d1230a174bb4bcc307a39ca570537582377af49e55a1ba1e5c4f58f739d52"
+                                                                ]
+                                },
+                                {
+                                    "id":  "SEC-HVCI",
+                                    "source_execution_class":  "C_MANUAL",
+                                    "execution_class":  "X_BLOCKED",
+                                    "normative_reason":  "Desativar VBS/HVCI e protecoes foi revogado; somente diagnostico permanece permitido.",
+                                    "normative_source":  [
+                                                             "10_MODO_AVANCADO_SEGURO/01_MATRIZ_POLITICAS_AVANCADAS_SEGURAS.json",
+                                                             "04_PROMPT_PARA_IA/PROMPT_ATIVO_GOAT_TWEAKS.txt"
+                                                         ],
+                                    "normative_source_sha256":  [
+                                                                    "00866211cadf8a24270c81af39b1f78c4b7b53fca9ccc37d2f1b7e2e9917d5df",
+                                                                    "7b3d1230a174bb4bcc307a39ca570537582377af49e55a1ba1e5c4f58f739d52"
+                                                                ]
+                                },
+                                {
+                                    "id":  "GPU-003",
+                                    "source_execution_class":  "D_LAB_ONLY",
+                                    "execution_class":  "X_BLOCKED",
+                                    "normative_reason":  "Alterar power limit/limites termicos fica fora dos executores permitidos do GPU Center.",
+                                    "normative_source":  [
+                                                             "10_MODO_AVANCADO_SEGURO/01_MATRIZ_POLITICAS_AVANCADAS_SEGURAS.json",
+                                                             "04_PROMPT_PARA_IA/PROMPT_ATIVO_GOAT_TWEAKS.txt"
+                                                         ],
+                                    "normative_source_sha256":  [
+                                                                    "00866211cadf8a24270c81af39b1f78c4b7b53fca9ccc37d2f1b7e2e9917d5df",
+                                                                    "7b3d1230a174bb4bcc307a39ca570537582377af49e55a1ba1e5c4f58f739d52"
+                                                                ]
+                                },
+                                {
+                                    "id":  "GPU-004",
+                                    "source_execution_class":  "D_LAB_ONLY",
+                                    "execution_class":  "X_BLOCKED",
+                                    "normative_reason":  "Clock lock/OC fica fora dos executores permitidos do GPU Center.",
+                                    "normative_source":  [
+                                                             "10_MODO_AVANCADO_SEGURO/01_MATRIZ_POLITICAS_AVANCADAS_SEGURAS.json",
+                                                             "04_PROMPT_PARA_IA/PROMPT_ATIVO_GOAT_TWEAKS.txt"
+                                                         ],
+                                    "normative_source_sha256":  [
+                                                                    "00866211cadf8a24270c81af39b1f78c4b7b53fca9ccc37d2f1b7e2e9917d5df",
+                                                                    "7b3d1230a174bb4bcc307a39ca570537582377af49e55a1ba1e5c4f58f739d52"
+                                                                ]
+                                }
+                            ],
+    "source_inconsistencies":  [
+                                   "V7.3 complementary scope_note says 66 controls but controls has 73.",
+                                   "Several legacy apply_mode=blocked records carry conditional automation text. X_BLOCKED wins during import.",
+                                   "Central v6_execution_contract refers to implementation_status == Tested; normative V7.3 requires IMPLEMENTED_AND_TESTED and real evidence. Import preserves all records as SPEC_ONLY_NOT_YET_VERIFIED.",
+                                   "Historical prompt precedence text conflicts with the newer unified GPU package. Active unified prompt and V7.3 safety requirements take precedence."
+                               ],
+    "semantic_overlap_groups":  [
+                                    {
+                                        "behavior":  "Game Mode",
+                                        "ids":  [
+                                                    "WIN-GAMEMODE",
+                                                    "WIN-GAME-MODE",
+                                                    "WIN-001"
+                                                ]
+                                    },
+                                    {
+                                        "behavior":  "Game DVR/background capture",
+                                        "ids":  [
+                                                    "WIN-CAPTURE",
+                                                    "WIN-002"
+                                                ]
+                                    },
+                                    {
+                                        "behavior":  "HAGS",
+                                        "ids":  [
+                                                    "WIN-HAGS",
+                                                    "GPU-HAGS-AB-TEST",
+                                                    "WIN-003",
+                                                    "GPU-OPT-007"
+                                                ]
+                                    },
+                                    {
+                                        "behavior":  "Windowed game optimizations",
+                                        "ids":  [
+                                                    "WIN-WINDOWED",
+                                                    "WIN11-WINDOWED-OPT",
+                                                    "WIN-004"
+                                                ]
+                                    },
+                                    {
+                                        "behavior":  "Windows per-app GPU preference",
+                                        "ids":  [
+                                                    "WIN-GPU-PREF",
+                                                    "WIN-GPU-APP-PREFERENCE",
+                                                    "WIN-GRAPHICS-PER-APP",
+                                                    "GPU-001"
+                                                ]
+                                    },
+                                    {
+                                        "behavior":  "Per-game frame cap",
+                                        "ids":  [
+                                                    "GAME-FRAME-CAP",
+                                                    "GAME-003",
+                                                    "GPU-OPT-009"
+                                                ]
+                                    },
+                                    {
+                                        "behavior":  "GPU driver official lookup",
+                                        "ids":  [
+                                                    "DRIVER-OFFICIAL-UPDATE-CHECK",
+                                                    "GPU-006",
+                                                    "DRV-002",
+                                                    "GPU-DRV-001",
+                                                    "GPU-DRV-002"
+                                                ]
+                                    },
+                                    {
+                                        "behavior":  "Driver clean reinstallation",
+                                        "ids":  [
+                                                    "DRIVER-DDU-ESCALATION",
+                                                    "DRV-003",
+                                                    "GPU-DRV-003"
+                                                ]
+                                    },
+                                    {
+                                        "behavior":  "Overlay inventory",
+                                        "ids":  [
+                                                    "WIN-OVERLAY",
+                                                    "APP-OVERLAY-INVENTORY",
+                                                    "OVR-001"
+                                                ]
+                                    },
+                                    {
+                                        "behavior":  "Power plan selection/comparison",
+                                        "ids":  [
+                                                    "PWR-PLAN",
+                                                    "POWER-PLAN-A_B",
+                                                    "WIN-006",
+                                                    "GAME-005"
+                                                ]
+                                    },
+                                    {
+                                        "behavior":  "RAM pressure",
+                                        "ids":  [
+                                                    "MEM-PRESSURE",
+                                                    "RAM-PRESSURE-PAGEFILE",
+                                                    "RAM-001"
+                                                ]
+                                    },
+                                    {
+                                        "behavior":  "Storage health and free space",
+                                        "ids":  [
+                                                    "STOR-HEALTH",
+                                                    "STORAGE-HEALTH-TEMP-SPACE",
+                                                    "DISK-001",
+                                                    "DISK-002"
+                                                ]
+                                    },
+                                    {
+                                        "behavior":  "Per-game process priority",
+                                        "ids":  [
+                                                    "CPU-PRIORITY",
+                                                    "CPU-GAME-PRIORITY",
+                                                    "CPU-003",
+                                                    "GAME-006"
+                                                ]
+                                    },
+                                    {
+                                        "behavior":  "Per-game process affinity",
+                                        "ids":  [
+                                                    "CPU-AFFINITY",
+                                                    "CPU-PROCESS-AFFINITY-LEASE",
+                                                    "CPU-004"
+                                                ]
+                                    },
+                                    {
+                                        "behavior":  "Benchmark frametime analysis",
+                                        "ids":  [
+                                                    "BENCH-FRAMETIME",
+                                                    "BENCH-001",
+                                                    "BENCH-002",
+                                                    "GPU-BENCH-002"
+                                                ]
+                                    }
+                                ],
+    "coverage":  [
+                     {
+                         "path":  "00_COMECE_AQUI_GOAT_TWEAKS.md",
+                         "sha256":  "b84a4706125c49d38c949c8b2717034f3e15c098f9b2cc686da57593e4a49279",
+                         "size_bytes":  2721,
+                         "characters_read":  2646,
+                         "parse":  "text"
+                     },
+                     {
+                         "path":  "00_LEIA_PRIMEIRO/01_MAPA_DO_PACOTE_V5.md",
+                         "sha256":  "693448f5fdb9cd002a3fea60f1de758bd5f5aafa277b3974e78cdd06dbf36627",
+                         "size_bytes":  1917,
+                         "characters_read":  1860,
+                         "parse":  "text"
+                     },
+                     {
+                         "path":  "00_LEIA_PRIMEIRO/01_MAPA_DO_PACOTE_V6_HISTORICO.md",
+                         "sha256":  "b4cad50c414afb3521e5bf3d740621c0a476d67e5c2f42c03bd12e56888c9b72",
+                         "size_bytes":  1597,
+                         "characters_read":  1534,
+                         "parse":  "text"
+                     },
+                     {
+                         "path":  "00_LEIA_PRIMEIRO/01_MAPA_DO_PACOTE_V7.md",
+                         "sha256":  "7d04ecccbde10606b654c81bd9b5555fd0df7815141fdf849dd9ba5b96252880",
+                         "size_bytes":  191,
+                         "characters_read":  186,
+                         "parse":  "text"
+                     },
+                     {
+                         "path":  "00_LEIA_PRIMEIRO/01_MAPA_DO_PACOTE_V7_2.md",
+                         "sha256":  "b1f2d66191cb9a72335938e7c31ed12f9dfb4a309664e3198f7839d6267d4493",
+                         "size_bytes":  1609,
+                         "characters_read":  1569,
+                         "parse":  "text"
+                     },
+                     {
+                         "path":  "00_LEIA_PRIMEIRO/02_MAPA_DO_PACOTE_V7_3.md",
+                         "sha256":  "81abc89b63f8d9ed7e30f57581f1686ff7e5734a0fbe0b9dde58f97e66f8344f",
+                         "size_bytes":  2241,
+                         "characters_read":  2175,
+                         "parse":  "text"
+                     },
+                     {
+                         "path":  "00_LEIA_PRIMEIRO/02_REGRA_V7_1_CADA_GANHO_IMPORTA.md",
+                         "sha256":  "c71de55d76dc88317edd2a9eb53938f76a6e2b395a9d105f0d0836a17244b678",
+                         "size_bytes":  534,
+                         "characters_read":  524,
+                         "parse":  "text"
+                     },
+                     {
+                         "path":  "00_LEIA_PRIMEIRO/README_LEIA_PRIMEIRO.md",
+                         "sha256":  "898005e93bed85f826a256acbe765172a936e97fdeba2de17634976b1ba216dd",
+                         "size_bytes":  3654,
+                         "characters_read":  3523,
+                         "parse":  "text"
+                     },
+                     {
+                         "path":  "01_DOCUMENTO_MESTRE/00_MASTER_TECNICO_V7_3.md",
+                         "sha256":  "60148fe27ef87d6d790bb80487ca6f0cc722751539546e17016cb97a7498ba27",
+                         "size_bytes":  21120,
+                         "characters_read":  20500,
+                         "parse":  "text"
+                     },
+                     {
+                         "path":  "01_DOCUMENTO_MESTRE/GOAT_TWEAKS_MASTER_V4.md",
+                         "sha256":  "19609bb743d1e8c4d1a4534da59064720edb24c2eabf0ba9da7d8db442fa8e21",
+                         "size_bytes":  742901,
+                         "characters_read":  728569,
+                         "parse":  "text"
+                     },
+                     {
+                         "path":  "02_ESPECIFICACAO_E_AUDITORIA/00_NOTA_V5.md",
+                         "sha256":  "403499439a75cb093739e3144158e2ffbb144a237ebfa283c7c70526148dd1c4",
+                         "size_bytes":  491,
+                         "characters_read":  467,
+                         "parse":  "text"
+                     },
+                     {
+                         "path":  "02_ESPECIFICACAO_E_AUDITORIA/01_AUDITORIA_CONSOLIDADA_V4.md",
+                         "sha256":  "4217f57c300e07e3585a14e3f91fa17a485f1ba71d4b3ec21162b1cd7c15abdf",
+                         "size_bytes":  52434,
+                         "characters_read":  51580,
+                         "parse":  "text"
+                     },
+                     {
+                         "path":  "02_ESPECIFICACAO_E_AUDITORIA/02_INTEGRACAO_ULTIMATE_WINSUX_EXM.md",
+                         "sha256":  "e4c712d5612e8688552c03596e091cb789d2d26fccae764975b247503ed3b4a8",
+                         "size_bytes":  19350,
+                         "characters_read":  18842,
+                         "parse":  "text"
+                     },
+                     {
+                         "path":  "02_ESPECIFICACAO_E_AUDITORIA/03_ANALISE_EXM_SEM_BIOS.md",
+                         "sha256":  "3a19c648971064c004e1b58d03eb39464994cd0aae5590a74658c095aeeb5223",
+                         "size_bytes":  43036,
+                         "characters_read":  40961,
+                         "parse":  "text"
+                     },
+                     {
+                         "path":  "02_ESPECIFICACAO_E_AUDITORIA/04_IMPLEMENTACAO_DETALHADA.md",
+                         "sha256":  "e04bc0fa3b2e162ed66c16cc947845202efc2ccdf6b7451b2855df7565e9462e",
+                         "size_bytes":  271548,
+                         "characters_read":  265100,
+                         "parse":  "text"
+                     },
+                     {
+                         "path":  "02_ESPECIFICACAO_E_AUDITORIA/PROMPT_MASTER_V4_HISTORICO_NAO_USAR.md",
+                         "sha256":  "ac7129ae9621e8ab343d971791333e716ada2a3a2a69bdc0ab10b328dc75284a",
+                         "size_bytes":  6832,
+                         "characters_read":  6779,
+                         "parse":  "text"
+                     },
+                     {
+                         "path":  "03_CATALOGOS_E_INVENTARIOS/01_CATALOGO_TECNICO_HISTORICO.json",
+                         "sha256":  "c885d54401710f49d8875bf232215d3f2bcc23783472ec264d72fa6a6a7e88c1",
+                         "size_bytes":  320067,
+                         "characters_read":  316166,
+                         "parse":  "json_ok",
+                         "scalar_leaves_read":  4174
+                     },
+                     {
+                         "path":  "03_CATALOGOS_E_INVENTARIOS/02_AUDITORIA_ARQUIVO_POR_ARQUIVO_V4.json",
+                         "sha256":  "6ddc0ad0728e0008730b5923f432c8f488d6bd8b4b6b81ccaefe9960e105007d",
+                         "size_bytes":  122738,
+                         "characters_read":  122351,
+                         "parse":  "json_ok",
+                         "scalar_leaves_read":  1480
+                     },
+                     {
+                         "path":  "03_CATALOGOS_E_INVENTARIOS/03_CATALOGO_EXM_PUBLICO_ANALISADO_V4.json",
+                         "sha256":  "8b3340f7517bf74b842d72309011b4d02de6b397e3f71da55b81d2c729e0f94d",
+                         "size_bytes":  31125,
+                         "characters_read":  31123,
+                         "parse":  "json_ok",
+                         "scalar_leaves_read":  529
+                     },
+                     {
+                         "path":  "03_CATALOGOS_E_INVENTARIOS/04_INVENTARIO_UPSTREAM.json",
+                         "sha256":  "f07d67826f403b8a34fe508a0eee11d58042081db68562fc905ff9d295e44161",
+                         "size_bytes":  14868,
+                         "characters_read":  14868,
+                         "parse":  "json_ok",
+                         "scalar_leaves_read":  238
+                     },
+                     {
+                         "path":  "04_PROMPT_PARA_IA/PROMPT_ATIVO_GOAT_TWEAKS.txt",
+                         "sha256":  "7b3d1230a174bb4bcc307a39ca570537582377af49e55a1ba1e5c4f58f739d52",
+                         "size_bytes":  6996,
+                         "characters_read":  6775,
+                         "parse":  "text"
+                     },
+                     {
+                         "path":  "04_PROMPT_PARA_IA/PROMPT_MASTER_V5_HISTORICO_NAO_USAR.txt",
+                         "sha256":  "75c3bea5c05847c377afa370b6e4c6b89739346c8b0166deb5f7569f11fe3144",
+                         "size_bytes":  9685,
+                         "characters_read":  9413,
+                         "parse":  "text"
+                     },
+                     {
+                         "path":  "04_PROMPT_PARA_IA/PROMPT_MASTER_V6_HISTORICO_NAO_USAR.txt",
+                         "sha256":  "040c26b4a2d53c0179f88af19fd03404df3b272c73529db23fe64a0cfd887b11",
+                         "size_bytes":  5958,
+                         "characters_read":  5750,
+                         "parse":  "text"
+                     },
+                     {
+                         "path":  "04_PROMPT_PARA_IA/PROMPT_MASTER_V7_1_HISTORICO_NAO_USAR.txt",
+                         "sha256":  "4bdb776a5d657b95864e9cf8cc128c80233ba89218fab8bfedb6c7d5fead9ae9",
+                         "size_bytes":  8139,
+                         "characters_read":  7865,
+                         "parse":  "text"
+                     },
+                     {
+                         "path":  "04_PROMPT_PARA_IA/PROMPT_MASTER_V7_2_HISTORICO_NAO_USAR.txt",
+                         "sha256":  "29d5b79c06e0e07d9e60ae1a322e22801778786dae6e62b2ad6aae4f82d0ec00",
+                         "size_bytes":  15913,
+                         "characters_read":  15404,
+                         "parse":  "text"
+                     },
+                     {
+                         "path":  "04_PROMPT_PARA_IA/PROMPT_MASTER_V7_3.txt",
+                         "sha256":  "f8f545fdff50f6553595080dffc2b06fd52d91695043d65fad233a30c5e8b5ac",
+                         "size_bytes":  7089,
+                         "characters_read":  6899,
+                         "parse":  "text"
+                     },
+                     {
+                         "path":  "05_LICENCAS_E_TERCEIROS/THIRD_PARTY_NOTICES.md",
+                         "sha256":  "bd02983d99a498cc4d9947c163129230a2bf5e314c0540a8e668534b453c7d18",
+                         "size_bytes":  2218,
+                         "characters_read":  2196,
+                         "parse":  "text"
+                     },
+                     {
+                         "path":  "06_INTEGRIDADE/MANIFESTO_GOAT_TWEAKS.json",
+                         "sha256":  "17809d900e5e6f8e099b53696c938bb85baacde67b6372c66d7facad1c24369c",
+                         "size_bytes":  19805,
+                         "characters_read":  19799,
+                         "parse":  "json_ok",
+                         "scalar_leaves_read":  335
+                     },
+                     {
+                         "path":  "06_INTEGRIDADE/MANIFESTO_PACOTE_ANTERIOR_HISTORICO_NAO_USAR.json",
+                         "sha256":  "0b3923f5aec8966dd738fcff587af912315d360573ea8fa6ca263ef5a3eca26b",
+                         "size_bytes":  5873,
+                         "characters_read":  5873,
+                         "parse":  "json_ok",
+                         "scalar_leaves_read":  90
+                     },
+                     {
+                         "path":  "06_INTEGRIDADE/MANIFESTO_PACOTE_V7_1_HISTORICO_NAO_USAR.json",
+                         "sha256":  "cfd38df2013fc802b204c525ec8caa21602e14ade66016356e01516d5540d2ff",
+                         "size_bytes":  7742,
+                         "characters_read":  7735,
+                         "parse":  "json_ok",
+                         "scalar_leaves_read":  116
+                     },
+                     {
+                         "path":  "06_INTEGRIDADE/MANIFESTO_PACOTE_V7_2.json",
+                         "sha256":  "c0ca2fad9eaa7751e1ffe3da3a1888a51ee24aa7b291e879fcd78b418f78c11b",
+                         "size_bytes":  10389,
+                         "characters_read":  10389,
+                         "parse":  "json_ok",
+                         "scalar_leaves_read":  157
+                     },
+                     {
+                         "path":  "06_INTEGRIDADE/MANIFESTO_PACOTE_V7_2_HISTORICO_NAO_USAR.json",
+                         "sha256":  "aace0c08154d34d6cb15465dd9c1d40f4a92e9b46e71bbe818a3dcae48644d49",
+                         "size_bytes":  10035,
+                         "characters_read":  10035,
+                         "parse":  "json_ok",
+                         "scalar_leaves_read":  152
+                     },
+                     {
+                         "path":  "06_INTEGRIDADE/MANIFESTO_PACOTE_V7_3.json",
+                         "sha256":  "90a2aa5937785100b6725424912a8ab3e1ecc1b8bbe04ed3010902c25371e99c",
+                         "size_bytes":  15626,
+                         "characters_read":  15584,
+                         "parse":  "json_ok",
+                         "scalar_leaves_read":  234
+                     },
+                     {
+                         "path":  "06_INTEGRIDADE/SHA256SUMS_ANTERIOR_HISTORICO_NAO_USAR.txt",
+                         "sha256":  "019f2f0b2798533eb24779a62efd1c5c481c7a93f9c07b431bc8eeeb573f0d72",
+                         "size_bytes":  3711,
+                         "characters_read":  3711,
+                         "parse":  "text"
+                     },
+                     {
+                         "path":  "06_INTEGRIDADE/SHA256SUMS_GOAT_TWEAKS.txt",
+                         "sha256":  "f62bd5f3565cb00c9bcafec2f269fe0f7ee76f47c02ec3c7a9d6a3525b8e7012",
+                         "size_bytes":  10296,
+                         "characters_read":  10296,
+                         "parse":  "text"
+                     },
+                     {
+                         "path":  "06_INTEGRIDADE/SHA256SUMS_V7_1_HISTORICO_NAO_USAR.txt",
+                         "sha256":  "027708c8b8207cce9936ae2b07a3ae6b1d52da0e1b8fce2365d0f636ad540a37",
+                         "size_bytes":  4988,
+                         "characters_read":  4988,
+                         "parse":  "text"
+                     },
+                     {
+                         "path":  "06_INTEGRIDADE/SHA256SUMS_V7_2.txt",
+                         "sha256":  "be563dc29a04f6606d99043c099e065574b95d96dfa3c290df0483afcd60bc7c",
+                         "size_bytes":  6443,
+                         "characters_read":  6443,
+                         "parse":  "text"
+                     },
+                     {
+                         "path":  "06_INTEGRIDADE/SHA256SUMS_V7_2_HISTORICO_NAO_USAR.txt",
+                         "sha256":  "18f69c71af1ac07665b9a15358267fcef042ad2e4dd701b0e76decf48f60a633",
+                         "size_bytes":  6098,
+                         "characters_read":  6098,
+                         "parse":  "text"
+                     },
+                     {
+                         "path":  "06_INTEGRIDADE/SHA256SUMS_V7_3.txt",
+                         "sha256":  "0f62e4ce5a3d42936db2da8afb5005ae0ed06e698620d71fafc676de4cff12c3",
+                         "size_bytes":  9305,
+                         "characters_read":  9305,
+                         "parse":  "text"
+                     },
+                     {
+                         "path":  "07_GUIA_OPERACIONAL_TECNICO/01_EXPERIENCIA_DO_TECNICO_E_UX.md",
+                         "sha256":  "0c3eb7b65c5cc74886357e2fc0a09873bb1f4dd4d11e8b3c17547ae99dc3b48e",
+                         "size_bytes":  10979,
+                         "characters_read":  10537,
+                         "parse":  "text"
+                     },
+                     {
+                         "path":  "07_GUIA_OPERACIONAL_TECNICO/02_PLAYBOOK_DIAGNOSTICO_BENCHMARK_E_REVERSAO.md",
+                         "sha256":  "30af6e666506b0e084cbbf0b74f8e3bd31983ba4c9bd0bd16bf01ad0a073edd3",
+                         "size_bytes":  9029,
+                         "characters_read":  8744,
+                         "parse":  "text"
+                     },
+                     {
+                         "path":  "07_GUIA_OPERACIONAL_TECNICO/03_GUIAS_MANUAIS_APLICATIVOS.md",
+                         "sha256":  "30d5ceca6cbc15cc0c0dbb8cd5dca9e00568f87e1abf7d81909d444d4bf476fd",
+                         "size_bytes":  7928,
+                         "characters_read":  7682,
+                         "parse":  "text"
+                     },
+                     {
+                         "path":  "07_GUIA_OPERACIONAL_TECNICO/04_MODELO_RELATORIO_DE_SERVICO.md",
+                         "sha256":  "e31e4484df222fd8e9a194fe09929f80143145c43822544575090290c757db2a",
+                         "size_bytes":  1803,
+                         "characters_read":  1748,
+                         "parse":  "text"
+                     },
+                     {
+                         "path":  "08_CATALOGO_CONFIGURACOES_EXPLICADAS/01_CATALOGO_CENTRAL_V5.json",
+                         "sha256":  "e73878ab6856f22d9bd68174c4d24caea32e1caac13c6e0f225dee5be9934dca",
+                         "size_bytes":  929467,
+                         "characters_read":  918481,
+                         "parse":  "json_ok",
+                         "scalar_leaves_read":  12764
+                     },
+                     {
+                         "path":  "08_CATALOGO_CONFIGURACOES_EXPLICADAS/02_LEGENDA_DO_CATALOGO.md",
+                         "sha256":  "186a22be27843d8dd96cfe66346a15d0f2bd84ac249e5bb821b4ff53152281dc",
+                         "size_bytes":  2867,
+                         "characters_read":  2746,
+                         "parse":  "text"
+                     },
+                     {
+                         "path":  "08_CATALOGO_CONFIGURACOES_EXPLICADAS/03_INDICE_COBERTURA_DO_CATALOGO.md",
+                         "sha256":  "916d889f0ababd22ab50c45f11593699737dc4de6eb60cb8ab9f9aa5a43f41bd",
+                         "size_bytes":  6288,
+                         "characters_read":  6217,
+                         "parse":  "text"
+                     },
+                     {
+                         "path":  "09_AUTOMACAO_E_FINALIZACAO/01_FLUXO_ATENDIMENTO_AUTOMATICO_V6.md",
+                         "sha256":  "d78bb024f16155def05468f75f862cb466ae8973b0db44c68fa2911630ef3ca3",
+                         "size_bytes":  6757,
+                         "characters_read":  6490,
+                         "parse":  "text"
+                     },
+                     {
+                         "path":  "09_AUTOMACAO_E_FINALIZACAO/02_BOTAO_FINALIZAR_SERVICO_E_LIMPEZA.md",
+                         "sha256":  "0347876985e3dbfe8ea40e71b2c58971bb58817fe22e3e9664b02115c7705012",
+                         "size_bytes":  7115,
+                         "characters_read":  6830,
+                         "parse":  "text"
+                     },
+                     {
+                         "path":  "09_AUTOMACAO_E_FINALIZACAO/03_AUTOMACAO_EM_LOTE_E_FALHA_SEGURA.md",
+                         "sha256":  "adf1221720049a9819b7d0ecde37c20f4fbce6d8fe2f78f6b62bf2972fa7cf91",
+                         "size_bytes":  3254,
+                         "characters_read":  3143,
+                         "parse":  "text"
+                     },
+                     {
+                         "path":  "09_AUTOMACAO_E_FINALIZACAO/04_CHECKLIST_ACEITACAO_E_RELEASE.md",
+                         "sha256":  "78be758ba29cdf937e1d3824652304300cf6b7dd7242312ba1f8596841d69187",
+                         "size_bytes":  2716,
+                         "characters_read":  2637,
+                         "parse":  "text"
+                     },
+                     {
+                         "path":  "09_AUTOMACAO_E_FINALIZACAO/05_CONTRATO_TECNICO_V6.json",
+                         "sha256":  "1667403b1e8d3e3c554c3af49041c8d901b03e00979ce7da7aedba676aef4c92",
+                         "size_bytes":  2758,
+                         "characters_read":  2757,
+                         "parse":  "json_ok",
+                         "scalar_leaves_read":  53
+                     },
+                     {
+                         "path":  "10_MODO_AVANCADO_SEGURO/00_DOUTRINA_AVANCADO_NO_LIMITE_SEGURO.md",
+                         "sha256":  "3262f3b904f4d396709ffae9e7ae6c8b061b4f57dc6af88603f1ec81c74da328",
+                         "size_bytes":  11340,
+                         "characters_read":  10912,
+                         "parse":  "text"
+                     },
+                     {
+                         "path":  "10_MODO_AVANCADO_SEGURO/01_MATRIZ_POLITICAS_AVANCADAS_SEGURAS.json",
+                         "sha256":  "00866211cadf8a24270c81af39b1f78c4b7b53fca9ccc37d2f1b7e2e9917d5df",
+                         "size_bytes":  6472,
+                         "characters_read":  6461,
+                         "parse":  "json_ok",
+                         "scalar_leaves_read":  130
+                     },
+                     {
+                         "path":  "10_MODO_AVANCADO_SEGURO/02_EXPANSAO_DO_CATALOGO_E_BENCHMARK.md",
+                         "sha256":  "64e5852dfbe1fa04efdd06c7e22a7634f902cc33fa4d63da7a026e3cf0c4e240",
+                         "size_bytes":  2267,
+                         "characters_read":  2174,
+                         "parse":  "text"
+                     },
+                     {
+                         "path":  "11_POLITICA_GANHOS_INCREMENTAIS/00_POLITICA_GANHOS_INCREMENTAIS_V7_1.md",
+                         "sha256":  "53c3584b6081f951e1e09c6640db661a6ad2ec2cd11246a58a1777c810c114c1",
+                         "size_bytes":  8417,
+                         "characters_read":  8113,
+                         "parse":  "text"
+                     },
+                     {
+                         "path":  "11_POLITICA_GANHOS_INCREMENTAIS/01_PROTOCOLO_BENCHMARK_RAPIDO_E_CONFIRMATORIO_V7_1.md",
+                         "sha256":  "fc1b9aa08430500feafd3f374fbf6a42c2ca8251c47ead5b4894ae25871c05a6",
+                         "size_bytes":  4144,
+                         "characters_read":  4004,
+                         "parse":  "text"
+                     },
+                     {
+                         "path":  "11_POLITICA_GANHOS_INCREMENTAIS/02_SCHEMA_REGISTRO_EVIDENCIAS_V7_1.json",
+                         "sha256":  "5e8f5216fd38412cae8e31edaab27856570eb65d3bd1623d58c1de6e23d7e620",
+                         "size_bytes":  2754,
+                         "characters_read":  2730,
+                         "parse":  "json_ok",
+                         "scalar_leaves_read":  47
+                     },
+                     {
+                         "path":  "12_REFERENCIA_E_INTEGRACAO_RESET_EXPLODE/00_AUDITORIA_TECNICA_RESET_EXPLODE_V0_16.md",
+                         "sha256":  "d526a25e5303b78c8a41341b6bbd93890ef014326fd6fec404825acfcd00a7db",
+                         "size_bytes":  14464,
+                         "characters_read":  14057,
+                         "parse":  "text"
+                     },
+                     {
+                         "path":  "12_REFERENCIA_E_INTEGRACAO_RESET_EXPLODE/01_MAPEAMENTO_INTEGRACAO_GOAT_V7_2.json",
+                         "sha256":  "ae8d320dec07757003ed01ff946a954b7c94d2cb2148d525d093ba367f749fb0",
+                         "size_bytes":  21415,
+                         "characters_read":  21411,
+                         "parse":  "json_ok",
+                         "scalar_leaves_read":  464
+                     },
+                     {
+                         "path":  "12_REFERENCIA_E_INTEGRACAO_RESET_EXPLODE/02_CHECKLIST_DE_ADAPTACAO_E_TESTES.md",
+                         "sha256":  "f6cee0cdbd072dd6e5a9047c23a6d644be169890bceb57282ff3cd3947a8947b",
+                         "size_bytes":  3395,
+                         "characters_read":  3296,
+                         "parse":  "text"
+                     },
+                     {
+                         "path":  "12_REFERENCIA_E_INTEGRACAO_RESET_EXPLODE/README.md",
+                         "sha256":  "3889c508dbff52c0b7e8103ea48e9e78c71f5db0474e4c2e6432a5569fa23fb6",
+                         "size_bytes":  1095,
+                         "characters_read":  1059,
+                         "parse":  "text"
+                     },
+                     {
+                         "path":  "13_AUDITORIA_ARQUIVO_POR_ARQUIVO_RESETEXPLODE/00_ESCOPO_E_NIVEIS_DE_REVISAO.md",
+                         "sha256":  "3008470944fe8764f664b18e301d7c85717fe925d4fca4d779d91f3db8f603f6",
+                         "size_bytes":  1107,
+                         "characters_read":  1073,
+                         "parse":  "text"
+                     },
+                     {
+                         "path":  "13_AUDITORIA_ARQUIVO_POR_ARQUIVO_RESETEXPLODE/01_INVENTARIO_135_ENTRADAS.json",
+                         "sha256":  "de80ca3eed8e85c6f4e425a5ca3062a57354e6208dac406b28c50b184294ddcf",
+                         "size_bytes":  57419,
+                         "characters_read":  56380,
+                         "parse":  "json_ok",
+                         "scalar_leaves_read":  960
+                     },
+                     {
+                         "path":  "13_AUDITORIA_ARQUIVO_POR_ARQUIVO_RESETEXPLODE/02_MATRIZ_ARQUIVO_DECISAO.csv",
+                         "sha256":  "0e5aef1e990f23fe39023a8835d2498cf131cb189ab88a3ec1e889ff627d9d6e",
+                         "size_bytes":  33341,
+                         "characters_read":  32333,
+                         "parse":  "csv_ok",
+                         "rows":  135,
+                         "columns":  [
+                                         "path",
+                                         "entry_type",
+                                         "category",
+                                         "review_depth",
+                                         "goat_decision",
+                                         "recommendation",
+                                         "source_ref"
+                                     ],
+                         "cells_read":  945
+                     },
+                     {
+                         "path":  "13_AUDITORIA_ARQUIVO_POR_ARQUIVO_RESETEXPLODE/03_AUDITORIA_TECNICA_MODULO_A_MODULO.md",
+                         "sha256":  "1b795440eaadb3d1ad0ed163397179833e7637f44695cb815e0ad1c1b1cf837a",
+                         "size_bytes":  8863,
+                         "characters_read":  8647,
+                         "parse":  "text"
+                     },
+                     {
+                         "path":  "13_AUDITORIA_ARQUIVO_POR_ARQUIVO_RESETEXPLODE/04_REFERENCIAS_E_LICENCAS.md",
+                         "sha256":  "2aa433f12821d4a195b0a4e100af2e2cd6417d91a0396b6b12d524ab08dee80f",
+                         "size_bytes":  1927,
+                         "characters_read":  1922,
+                         "parse":  "text"
+                     },
+                     {
+                         "path":  "13_AUDITORIA_ARQUIVO_POR_ARQUIVO_RESETEXPLODE/05_INDICE_COMPLETO_DA_ARVORE.md",
+                         "sha256":  "e9133667e443ceb8c65ead905d9438e79ce88dde850894d270ea07104a46c012",
+                         "size_bytes":  17931,
+                         "characters_read":  16380,
+                         "parse":  "text"
+                     },
+                     {
+                         "path":  "14_ESPECIFICACAO_TECNICA_V7_3/00_MASTER_TECNICO_V7_3.md",
+                         "sha256":  "60148fe27ef87d6d790bb80487ca6f0cc722751539546e17016cb97a7498ba27",
+                         "size_bytes":  21120,
+                         "characters_read":  20500,
+                         "parse":  "text"
+                     },
+                     {
+                         "path":  "14_ESPECIFICACAO_TECNICA_V7_3/01_UX_COMPONENTES_E_FLUXOS.md",
+                         "sha256":  "6b554363a3f0784c4eb21a625ace5488220e8298d8e8abbe3169642f291b0b8f",
+                         "size_bytes":  2792,
+                         "characters_read":  2681,
+                         "parse":  "text"
+                     },
+                     {
+                         "path":  "14_ESPECIFICACAO_TECNICA_V7_3/02_CONTRATO_DE_ACOES_TRANSACOES_E_ROLLBACK.md",
+                         "sha256":  "646ab190d072116c497b76a0bdf14e9d2594b0d146e57dfe03429ecf3a6a6f43",
+                         "size_bytes":  2924,
+                         "characters_read":  2902,
+                         "parse":  "text"
+                     },
+                     {
+                         "path":  "14_ESPECIFICACAO_TECNICA_V7_3/03_BENCHMARK_MICROGANHOS_E_EVIDENCIAS.md",
+                         "sha256":  "fa805fdf69ac4c96fd1885a52743fe427ce9a851e8d45b3c4c4072fe4019b918",
+                         "size_bytes":  2747,
+                         "characters_read":  2732,
+                         "parse":  "text"
+                     },
+                     {
+                         "path":  "14_ESPECIFICACAO_TECNICA_V7_3/04_STEAM_DISCORD_OBS_E_OVERLAYS.md",
+                         "sha256":  "f91fca15dee5a97ad5e61b7bd89507134afe63e72b8b2a2820668c4a7a714ca4",
+                         "size_bytes":  2782,
+                         "characters_read":  2720,
+                         "parse":  "text"
+                     },
+                     {
+                         "path":  "14_ESPECIFICACAO_TECNICA_V7_3/05_FINALIZAR_SERVICO_E_UNINSTALL.md",
+                         "sha256":  "cdca01001ae3c58f3bd08619410b0139de6c199565cacb02890e9c65b9329792",
+                         "size_bytes":  2639,
+                         "characters_read":  2598,
+                         "parse":  "text"
+                     },
+                     {
+                         "path":  "14_ESPECIFICACAO_TECNICA_V7_3/06_PROTOCOLO_ATENDIMENTO_REMOTO.md",
+                         "sha256":  "9d68c10a2c0b1bf587705009515877e30c65ad8f81dd24881aac41ea3da40dcf",
+                         "size_bytes":  1635,
+                         "characters_read":  1591,
+                         "parse":  "text"
+                     },
+                     {
+                         "path":  "15_CATALOGOS_EXTENSOES_V7_3/00_LEIA_CATALOGO_COMPLEMENTAR.md",
+                         "sha256":  "a333cd6aa319befb032c5dd8acca2fd20dfee283cfc84b656fb923780049b4a8",
+                         "size_bytes":  1149,
+                         "characters_read":  1116,
+                         "parse":  "text"
+                     },
+                     {
+                         "path":  "15_CATALOGOS_EXTENSOES_V7_3/01_CATALOGOS_V7_3_COMPLEMENTOS.json",
+                         "sha256":  "709a8f8675fcf390096cb240bf1e7e13b6f183af2235209491f0ef34b94655e5",
+                         "size_bytes":  37825,
+                         "characters_read":  37592,
+                         "parse":  "json_ok",
+                         "scalar_leaves_read":  676
+                     },
+                     {
+                         "path":  "16_PLANO_IMPLEMENTACAO_E_TESTES_V7_3/00_PLANO_E_CHECKLIST_ACEITACAO.md",
+                         "sha256":  "ce2afe7de21c1df950e40ee29a7deafe737e991dc2d720e11fb564ffbbee82e7",
+                         "size_bytes":  4024,
+                         "characters_read":  3991,
+                         "parse":  "text"
+                     },
+                     {
+                         "path":  "17_ATUALIZACAO_GOAT_TWEAKS_GPU_CENTER/01_ESPECIFICACAO_GPU_CENTER.md",
+                         "sha256":  "dcc1a1d8cfdef38c9306bdfbcb92e8d3209a4c4e5c509d8a3a6d599008443285",
+                         "size_bytes":  7119,
+                         "characters_read":  6891,
+                         "parse":  "text"
+                     },
+                     {
+                         "path":  "17_ATUALIZACAO_GOAT_TWEAKS_GPU_CENTER/02_CATALOGO_FUNCOES_GPU.json",
+                         "sha256":  "87cf15c8c9d51b7d6ffb06ceacbaa4dcd87bc13c68a13ddca315e405f1fb229d",
+                         "size_bytes":  13824,
+                         "characters_read":  13722,
+                         "parse":  "json_ok",
+                         "scalar_leaves_read":  283
+                     },
+                     {
+                         "path":  "17_ATUALIZACAO_GOAT_TWEAKS_GPU_CENTER/03_TELAS_FLUXOS_E_RELATORIO.md",
+                         "sha256":  "19706f09f67b1f605aa67e3232d95860542276070af0b989aa9c2f57293fd6a0",
+                         "size_bytes":  3604,
+                         "characters_read":  3428,
+                         "parse":  "text"
+                     },
+                     {
+                         "path":  "17_ATUALIZACAO_GOAT_TWEAKS_GPU_CENTER/04_PLANO_TESTES_E_CRITERIOS.md",
+                         "sha256":  "a7547724810adb219d5997828dbee57822296876930f3723cd4a770c8f1eb8f0",
+                         "size_bytes":  3353,
+                         "characters_read":  3235,
+                         "parse":  "text"
+                     },
+                     {
+                         "path":  "17_ATUALIZACAO_GOAT_TWEAKS_GPU_CENTER/05_ORIGEM_DO_PROJETO_E_CONTINUIDADE.md",
+                         "sha256":  "c4b096bf72589c661268921ede177189a55fe3c213b93e03eddc3b497e652915",
+                         "size_bytes":  2278,
+                         "characters_read":  2217,
+                         "parse":  "text"
+                     },
+                     {
+                         "path":  "99_HISTORICO_E_REFERENCIAS/00_HISTORICO_E_PRECEDENCIA.md",
+                         "sha256":  "5c1559fd5b688e9bade39c164935993d61e6102cc0e8c21cd8df1b441da3ec13",
+                         "size_bytes":  609,
+                         "characters_read":  587,
+                         "parse":  "text"
+                     }
+                 ]
+}
