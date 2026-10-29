@@ -1,60 +1,30 @@
 {
-  "date_local": "2026-10-28",
-  "timezone": "America/Sao_Paulo",
-  "version": "7.4.0",
+  "version": "7.4.1",
   "channel": "Official",
+  "date_local": "2026-10-28",
   "engine": "Windows PowerShell 5.1 x64 STA",
-  "suites_passed": 15,
-  "suites_failed": 0,
-  "assertions": 4648.0,
-  "suite_assertions": {
-    "AdvancedGuides": 472,
-    "Benchmark": 66,
-    "Catalog": 3322,
-    "Core": 190,
-    "Gpu": 44,
-    "Inventory": 45,
-    "Launch": 33,
-    "Power": 118,
-    "Presentation": 23,
-    "RegistryIntegration": 54,
-    "Release": 56,
+  "scope": "Logo, binary resource embedding, rendering, distribution and report version",
+  "local_check_runs": 4,
+  "local_assertions": 365,
+  "failures": 0,
+  "check_assertions": {
+    "Release": 57,
     "Reports": 36,
-    "ReportsPower": 39,
-    "Runtime": 14,
-    "UI": 136
+    "UiSourceDemo": 136,
+    "UiBundledDemo": 136
   },
-  "bundled_ui_assertions_passed": 136,
-  "real_readonly_ui_assertions_passed": 25,
-  "navigation_pages": 18,
-  "catalog_records": 344,
-  "source_effective_blocks_preserved": 50,
-  "advanced_procedures": 50,
-  "native_registry_executors": 16,
-  "additional_native_manual_guides": 1,
-  "power_executor": "Existing schemes only",
-  "bundle_sha256": "928c2970d065bfa188f78d7695e42adb39ec48d995cd821ba13b4840015432cd",
-  "real_readonly_observation": {
-    "monitor_count": 1,
-    "storage_reliability": "UNAVAILABLE",
-    "os_build": 19045,
-    "gpu_count": 1,
-    "gpu_vendors": [
-      "NVIDIA"
-    ]
+  "bundle_sha256": "c49992286663fdb718af7ac0ddc6d2e12ea974666f0ac5c12f2830c3236ee0b1",
+  "logo_sha256": "392b8e3de8aeec806108b8e80e7e21fab71f8f15526b5a3dc95262e211a4176b",
+  "embedded_logo_identical_to_user_image": true,
+  "visual_render_reviewed": true,
+  "baseline": {
+    "version": "7.4.0",
+    "suites_passed": 15,
+    "assertions": 4648,
+    "result": "audit/VALIDATION-7.4.0.json"
   },
+  "ci": "Existing complete Windows workflow required before publication",
   "real_windows_preferences_modified": false,
   "real_power_scheme_modified": false,
-  "real_registry_integration_scope": "Own disposable HKCU Software/GOAT-Tweaks-Tests/GUID only; removed after test",
-  "pending": [
-    "Windows 11 physical",
-    "AMD physical",
-    "Intel physical",
-    "Effect of actual Windows preferences and power schemes on disposable systems",
-    "Physical remote failure recovery",
-    "Full screen-reader and DPI matrix",
-    "Publisher signing",
-    "Large capture load testing"
-  ],
-  "scope": "Native executor persistence/recovery, existing power schemes, 50 assisted procedures, diagnostics, profiles, capture analysis and reporting. Windows preference and power mutations were mocked; the real Registry API was tested only in an owned disposable key. Not hardware certification or a performance claim."
+  "limitations": "Visual patch does not add hardware validation or publisher signing."
 }

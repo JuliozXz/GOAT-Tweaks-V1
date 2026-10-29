@@ -245,6 +245,13 @@ function Show-GoatApp {
     param([switch]$Demo,[string]$DataRoot,[string]$SessionPath)
     Add-Type -AssemblyName PresentationFramework,PresentationCore,WindowsBase,System.Windows.Forms
     $window=[Windows.Markup.XamlReader]::Parse($script:GoatXaml)
+    $logoStream=[IO.MemoryStream]::new([Convert]::FromBase64String($script:GoatLogoBase64))
+    try {
+        $logo=[Windows.Media.Imaging.BitmapImage]::new();$logo.BeginInit()
+        $logo.CacheOption=[Windows.Media.Imaging.BitmapCacheOption]::OnLoad;$logo.StreamSource=$logoStream
+        $logo.EndInit();$logo.Freeze()
+    }finally{$logoStream.Dispose()}
+    $window.FindName('AppLogo').Source=$logo;$window.Icon=$logo
     $window.Title='GOAT Tweaks '+$script:GoatVersion+' · GPU Center'
     $area=[Windows.SystemParameters]::WorkArea
     if($area.Width -gt 0){$window.MinWidth=[Math]::Min($window.MinWidth,$area.Width);$window.Width=[Math]::Min($window.Width,$area.Width);$window.MaxWidth=$area.Width}

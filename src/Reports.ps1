@@ -43,7 +43,7 @@ function Get-GoatPublicReport {
     $power=@();if(Get-Command Get-GoatPowerTransactions -ErrorAction SilentlyContinue){$power=@(Get-GoatPowerTransactions $Session|Select-Object Id,State,CreatedUtc,OriginalSchemeGuid,ProposedSchemeGuid,ReadBackVerified)}
     $manual=@($Session.ManualRecords|Where-Object {$null -ne $_}|Select-Object Id,Title,Utc,State,AutomaticallyVerified,Risk)
     $report=[pscustomobject]@{
-        Product='GOAT Tweaks';Version=$(if($script:GoatVersion){$script:GoatVersion}else{'7.4.0'});SchemaVersion=1;Session=$Session.Id;CreatedUtc=$Session.CreatedUtc
+        Product='GOAT Tweaks';Version=$(if($script:GoatVersion){$script:GoatVersion}else{'7.4.1'});SchemaVersion=1;Session=$Session.Id;CreatedUtc=$Session.CreatedUtc
         Objective=$Session.Objective;Mode=$Session.Mode;Demo=$Session.Demo;State=$(if($Session.State -eq 'Finalizing'){'Finalized'}else{$Session.State})
         Hardware=$hardware;Transactions=$transactions;PowerTransactions=$power;ManualRecords=$manual
         Benchmarks=@($Session.Benchmarks | ForEach-Object { [pscustomobject]@{ConditionLabel=$_.ConditionLabel;PassNumber=$_.PassNumber;Conditions=$_.Conditions;Metrics=$_.Metrics;SourceSha256=$_.Source.Sha256;IntervalColumn=$_.Source.Column;IntervalUnits=$_.Source.Units;IntervalSemantics=$_.Source.Semantics;RowsImported=$_.Source.RowsImported} })

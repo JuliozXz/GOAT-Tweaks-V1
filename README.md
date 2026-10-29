@@ -1,6 +1,6 @@
-﻿# GOAT Tweaks — 7.4.0
+﻿# GOAT Tweaks — 7.4.1
 
-Aplicativo de diagnóstico e atendimento técnico em **Windows PowerShell 5.1 e WPF**, com código, interface e motor próprios. A versão 7.4.0 acrescenta aplicação revisada de 16 preferências/políticas de Registro e seleção de plano de energia existente. Abrir o app continua sendo uma operação de diagnóstico; mudanças dependem de seleção, prévia, elegibilidade e consentimento.
+Aplicativo de diagnóstico e atendimento técnico em **Windows PowerShell 5.1 e WPF**, com código, interface e motor próprios. A versão 7.4.1 incorpora a logo fornecida pelo usuário ao lado do nome e ao ícone da janela. Mantém a aplicação revisada de 16 preferências/políticas de Registro e a seleção de plano de energia existente. Abrir o app continua sendo uma operação de diagnóstico; mudanças dependem de seleção, prévia, elegibilidade e consentimento.
 
 O arquivo **`dist/GOAT-Tweaks.ps1` é independente**: inclui interface, módulos, 344 registros de catálogo e 64 documentos. Funciona sem baixar módulos, ferramentas, drivers ou scripts. Requer Windows 10/11 x64; não requer administração para diagnóstico.
 
@@ -8,7 +8,7 @@ O arquivo **`dist/GOAT-Tweaks.ps1` é independente**: inclui interface, módulos
 
 ## Abrir
 
-Abra a [release v7.4.0](https://github.com/JuliozXz/GOAT-Tweaks-V1/releases/tag/v7.4.0), copie a única linha de `Open-GOAT.txt` e cole no PowerShell. Ela baixa o app da versão fixa, confere o SHA256 antes de executar, abre em Windows PowerShell 5.1 STA e remove somente o arquivo temporário criado quando o app fecha. Não é necessário instalar Git, GitHub CLI, winget ou módulos para abrir o aplicativo.
+Abra a [release v7.4.1](https://github.com/JuliozXz/GOAT-Tweaks-V1/releases/tag/v7.4.1), copie a única linha de `Open-GOAT.txt` e cole no PowerShell. Ela baixa o app da versão fixa, confere o SHA256 antes de executar, abre em Windows PowerShell 5.1 STA e remove somente o arquivo temporário criado quando o app fecha. Não é necessário instalar Git, GitHub CLI, winget ou módulos para abrir o aplicativo.
 
 O comando completo também fica em [dist/Open-GOAT.txt](dist/Open-GOAT.txt). O hash esperado está dentro da linha; divergência ou download interrompido bloqueiam a execução. A opção de execução usada pelo processo filho não altera a política de execução do Windows.
 
@@ -69,7 +69,7 @@ powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -File .\scripts\Build.ps1
 powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -File .\scripts\Test.ps1
 ```
 
-Saídas: `dist/GOAT-Tweaks.ps1`, `GOAT-Tweaks.sha256`, `build-manifest.json`, `GOAT-Tweaks-7.4.0.zip`, `Open-GOAT.txt` e `launch.json`. A versão vem do arquivo `VERSION`. O bundle ASCII contém recursos UTF-8 comprimidos em GZip e Base64, decodificados localmente em memória. O código legível está em `src/`. Não há execução de texto do catálogo ou dos prompts.
+Saídas: `dist/GOAT-Tweaks.ps1`, `GOAT-Tweaks.sha256`, `build-manifest.json`, `GOAT-Tweaks-7.4.1.zip`, `Open-GOAT.txt` e `launch.json`. A versão vem do arquivo `VERSION`. O bundle ASCII contém recursos UTF-8 comprimidos em GZip e Base64, decodificados localmente em memória. O código legível está em `src/`. Não há execução de texto do catálogo ou dos prompts.
 
 Os testes de ações usam mocks para aplicação, falha, read-back e restauração de todos os executores, sem mudar preferências do Windows. `tests/Test-RegistryIntegration.ps1` também verifica a API real de Registro somente em uma chave própria e descartável `HKCU\Software\GOAT-Tweaks-Tests\GUID`, incluindo tipos binários, strings, arrays e ausência original. A UI usa Demo; energia é testada com fixtures, sem trocar o plano real. Há leituras reais de inventário nesta máquina. Esse escopo não certifica efeitos em outras versões do Windows, GPUs ou configurações de jogos.
 
@@ -85,7 +85,7 @@ A liberação dos 16 executores confirma código e testes de armazenamento/rever
 
 Modo de Jogo e atalho do controle para Game Bar têm executor somente no Windows 11. A política `AllowGameDVR` exige Windows 10 desktop, edição compatível, administração, console local e ausência de gerenciamento corporativo confirmado; no Windows 11 a captura permanece assistida. A Microsoft documenta essa limitação da política em [ApplicationManagement/AllowGameDVR](https://learn.microsoft.com/en-us/windows/client-management/mdm/policy-csp-applicationmanagement#allowgamedvr). Temas e transparência são preferências de aparência, não otimizações de FPS.
 
-Sensores de temperatura, hotspot, clocks, potência e VRAM ficam indisponíveis sem provedor validado. Captura ETW, overlay injetado, OC, undervolt, BIOS/UEFI, MSI/HPET/BCD, desativação de segurança e remoção automática de drivers não ganharam executores pelo fato de aparecerem no catálogo. Consulte [as mudanças e o escopo da 7.4.0](docs/RELEASE-7.4.0.md).
+Sensores de temperatura, hotspot, clocks, potência e VRAM ficam indisponíveis sem provedor validado. Captura ETW, overlay injetado, OC, undervolt, BIOS/UEFI, MSI/HPET/BCD, desativação de segurança e remoção automática de drivers não ganharam executores pelo fato de aparecerem no catálogo. Consulte [as mudanças e o escopo da 7.4.1](docs/RELEASE-7.4.1.md).
 
 A revisão do pacote está em [docs/audit/RELEASE-REVIEW.md](docs/audit/RELEASE-REVIEW.md). A integridade da fonte documental não prova a eficácia de suas sugestões históricas. Correções e decisões atuais ficam registradas separadamente, preservando os documentos recebidos.
 

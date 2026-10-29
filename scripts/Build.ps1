@@ -42,6 +42,9 @@ foreach($resource in @(@{Name='GoatXaml';Path='src/UI.xaml'},@{Name='GoatCatalog
     $parts.Add('$script:'+$resource.Name+"=Read-GoatPackedResource '"+(ConvertTo-GoatPackedResource $content)+"'")
     $manifest+=[pscustomobject]@{Path=$resource.Path;Sha256=(Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash}
 }
+$logoPath=Join-Path $root 'assets/goat-logo.png'
+$parts.Add("`$script:GoatLogoBase64='"+[Convert]::ToBase64String([IO.File]::ReadAllBytes($logoPath))+"'")
+$manifest+=[pscustomobject]@{Path='assets/goat-logo.png';Sha256=(Get-FileHash -LiteralPath $logoPath -Algorithm SHA256).Hash}
 $entry=Get-Content -LiteralPath (Join-Path $root 'src/Entry.ps1') -Raw -Encoding UTF8
 $parts.Add(". ([scriptblock]::Create((Read-GoatPackedResource '"+(ConvertTo-GoatPackedResource $entry)+"')))")
 $bundle=Join-Path $dist 'GOAT-Tweaks.ps1';[IO.File]::WriteAllText($bundle,($parts -join "`r`n`r`n"),[Text.Encoding]::ASCII)
