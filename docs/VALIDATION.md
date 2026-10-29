@@ -1,10 +1,18 @@
-﻿# Validação da versão oficial 7.4.0
+﻿# Validação da versão oficial 7.4.1
+
+Esta atualização altera a identidade visual: PNG original ao lado do nome e no ícone da janela, incorporado ao arquivo independente. A imagem do bundle foi comparada por SHA256 com o arquivo enviado; os bytes são idênticos. A renderização da interface foi conferida visualmente em Windows PowerShell 5.1.
+
+Verificações locais focadas: contrato da release (57), relatórios/versão (36), interface Demo dos fontes (136) e interface Demo do bundle (136): **365 verificações, zero falhas**. O resumo atual está em `validation-results.json`. O workflow completo existente também é exigido antes da publicação.
+
+A validação funcional da 7.4.0 abaixo permanece como histórico e base para os módulos que não foram alterados. Seu resumo original foi preservado em `audit/VALIDATION-7.4.0.json`.
+
+# Validação da versão oficial 7.4.0
 
 A versão oficial 7.4.0 publica os fluxos implementados em Windows PowerShell 5.1 x64 e WPF, incluindo os executores nativos e o centro de energia. O bundle é um arquivo PowerShell com módulos, interface e dados incorporados. Não possui assinatura Authenticode de editor. O hash SHA-256 permite conferir integridade do arquivo distribuído; não identifica um editor nem certifica segurança ou compatibilidade universal.
 
 ## Verificações executadas
 
-Em 28/10/2026, as **15 suítes passaram em 4.648 verificações, zero falhas**. O fluxo WPF do bundle passou em **136 verificações adicionais** e a interface física somente leitura em **25**. O resumo está em `validation-results.json`, com contagens por suíte e hash do bundle testado. Inclui o runner completo, o fluxo WPF Demo do bundle independente e uma verificação da interface real somente leitura. O ambiente físico disponível é Windows 10 build 19045, uma GPU NVIDIA e um monitor; confiabilidade SMART indisponível permanece indisponível.
+Em 28/10/2026, as **15 suítes passaram em 4.648 verificações, zero falhas**. O fluxo WPF do bundle passou em **136 verificações adicionais** e a interface física somente leitura em **25**. O resumo histórico está em `audit/VALIDATION-7.4.0.json`, com contagens por suíte e hash do bundle testado. Inclui o runner completo, o fluxo WPF Demo do bundle independente e uma verificação da interface real somente leitura. O ambiente físico disponível é Windows 10 build 19045, uma GPU NVIDIA e um monitor; confiabilidade SMART indisponível permanece indisponível.
 
 Os testes automatizados foram executados no Windows, em processos isolados de Windows PowerShell 5.1 STA. Cada execução registra o resultado de cada suíte e os logs em `artifacts/test-results/results.json` e arquivos adjacentes. As contagens presentes nesse relatório correspondem à execução realizada; alterações de código exigem nova execução.
 

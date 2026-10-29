@@ -1,6 +1,6 @@
-# Fontes e avisos
+﻿# Fontes e avisos
 
-O código desta aplicação foi escrito do zero para a solicitação atual. Nenhum executável, driver, asset, script ou módulo dos projetos Ultimate, WinSux, EXM, Winutil, RyTuneX ou RESET EXPLODE foi incorporado como executor. O aplicativo antigo GOAT-Tweaks-V1 e seu PR #1 foram consultados para entender a origem do pacote; seu código e logo não foram reutilizados.
+O código desta aplicação foi escrito do zero para a solicitação atual. Nenhum executável, driver, asset, script ou módulo dos projetos Ultimate, WinSux, EXM, Winutil, RyTuneX ou RESET EXPLODE foi incorporado como executor. O aplicativo antigo GOAT-Tweaks-V1 e seu PR #1 foram consultados para entender a origem do pacote; seu código não foi reutilizado. A logo atual foi fornecida pelo usuário nesta solicitação e está incorporada sem edição em assets/goat-logo.png.
 
 `data/catalog.json` e `data/documents.json` reproduzem material do pacote fornecido pelo usuário como referência documental. Os avisos e referências originais permanecem na biblioteca do aplicativo, incluindo o documento `05_LICENCAS_E_TERCEIROS/THIRD_PARTY_NOTICES.md`. Hashes e proveniência ficam em `docs/audit/`. A importação não confirma a licença de projetos citados nem autoriza redistribuir seus binários.
 

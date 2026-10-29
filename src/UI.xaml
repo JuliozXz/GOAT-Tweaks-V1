@@ -17,7 +17,7 @@
  </Window.Resources>
  <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="208"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
   <Border Background="#14161B" BorderBrush="#292C34" BorderThickness="0,0,1,0"><DockPanel Margin="16,22,16,16">
-   <StackPanel DockPanel.Dock="Top"><TextBlock Text="G / GOAT" FontSize="26" FontWeight="Bold" Foreground="{StaticResource Gold}"/><TextBlock Text="TWEAKS · BY JULIO" FontSize="10" Foreground="#9D9FA8" Margin="0,4,0,14"/><TextBlock x:Name="ModeLabel" Text="7.4.0 · EDIÇÃO OFICIAL" FontSize="9" Foreground="#C7B583" Margin="0,0,0,20"/></StackPanel>
+   <StackPanel DockPanel.Dock="Top"><Grid Margin="0,0,0,16"><Grid.ColumnDefinitions><ColumnDefinition Width="52"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Border Background="#080808" CornerRadius="8" Width="52" Height="52"><Image x:Name="AppLogo" Width="50" Height="50" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality" ToolTip="Logo GOAT Tweaks" AutomationProperties.Name="Logo GOAT Tweaks"/></Border><StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center"><TextBlock Text="GOAT" FontSize="25" FontWeight="Bold" Foreground="{StaticResource Gold}"/><TextBlock Text="TWEAKS · BY JULIO" FontSize="9" Foreground="#A9ACB8" Margin="0,3,0,0"/></StackPanel></Grid><TextBlock x:Name="ModeLabel" Text="7.4.1 · EDIÇÃO OFICIAL" FontSize="9" Foreground="#C7B583" Margin="0,0,0,20"/></StackPanel>
    <TextBlock DockPanel.Dock="Bottom" Text="Diagnóstico com contexto.&#10;Cada resultado precisa de evidência." FontSize="10" Foreground="#90939F" Margin="0,15,0,0"/>
    <ScrollViewer VerticalScrollBarVisibility="Auto"><ListBox x:Name="Navigation"/></ScrollViewer>
   </DockPanel></Border>

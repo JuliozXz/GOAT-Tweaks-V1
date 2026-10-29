@@ -1,7 +1,7 @@
 {
-    "Version":  "7.4.0",
+    "Version":  "7.4.1",
     "Channel":  "Official",
-    "BundleSha256":  "928c2970d065bfa188f78d7695e42adb39ec48d995cd821ba13b4840015432cd",
+    "BundleSha256":  "c49992286663fdb718af7ac0ddc6d2e12ea974666f0ac5c12f2830c3236ee0b1",
     "Sources":  [
                     {
                         "Path":  "src/Core.ps1",
@@ -33,7 +33,7 @@
                     },
                     {
                         "Path":  "src/Reports.ps1",
-                        "Sha256":  "B434F15967D74135B8C01BB037B694790BCFE240D76322C3F26E83202020EFD9"
+                        "Sha256":  "04751E76B3F49DF5B2785824BFAE3DF1480EA8E0A3A1D840DAEE58E7F97FF171"
                     },
                     {
                         "Path":  "src/Presentation.ps1",
@@ -41,11 +41,11 @@
                     },
                     {
                         "Path":  "src/App.ps1",
-                        "Sha256":  "C28EE8A6C827FAE621D23527BA3538ACBABBE8EA6E9E236B78A3B1B9D62A776C"
+                        "Sha256":  "E4965DF6D612351EF2AB57514A953788FAF0EE9272F8013E234271349078E50E"
                     },
                     {
                         "Path":  "src/UI.xaml",
-                        "Sha256":  "EBE9DF4E9C1901AB8F3E773F68AB45DBEAE07E2A07DDA428C0B90C461779642F"
+                        "Sha256":  "6C4575AFAFDA718A0715C57EE6714291C5837925B9EBE8F7D885F1DE1A5E6AEB"
                     },
                     {
                         "Path":  "data/catalog.json",
@@ -56,16 +56,20 @@
                         "Sha256":  "6C117C4BBA3DB02CA4F7EEECF91D5071481303365ED54DE8E5F02B6D7E555364"
                     },
                     {
+                        "Path":  "assets/goat-logo.png",
+                        "Sha256":  "392B8E3DE8AEEC806108B8E80E7E21FAB71F8F15526B5A3DC95262E211A4176B"
+                    },
+                    {
                         "Path":  "src/Entry.ps1",
                         "Sha256":  "36003AAC78D6B72AA396EAB305FB8FB27F5A831CC7A3CC0414D47074D22D74B8"
                     },
                     {
                         "Path":  "VERSION",
-                        "Sha256":  "2215201B9F61246415261BEC0B633B35AF9BAA62198A2143413FCFDBF04360E0"
+                        "Sha256":  "910121D8FDA1EE513D664110F94BEF46C4791698010DB514C2A71CC1932BC3CF"
                     },
                     {
                         "Path":  "scripts/Build.ps1",
-                        "Sha256":  "EF2AC8D5E9BEBC1DADA3DE600F2BBE9DD2EDBCC05AF8D5F96EE5C8F91E90FB6F"
+                        "Sha256":  "5D2904857ABFBB3A019C13E3E95AF7C9C39C8386C7A2C07FB1D1DE48148B43D1"
                     },
                     {
                         "Path":  "scripts/New-LaunchCommand.ps1",

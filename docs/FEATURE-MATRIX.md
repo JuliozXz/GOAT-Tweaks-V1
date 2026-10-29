@@ -1,4 +1,4 @@
-# Matriz funcional — GOAT Tweaks 7.4.0
+﻿# Matriz funcional — GOAT Tweaks 7.4.1
 
 O aplicativo reúne diagnóstico, catálogo, referências, perfis consultivos, medições importadas, transações e relatórios. As 18 páginas reúnem diagnóstico, execução e procedimentos assistidos. Há **16 executores de Registro**, **seleção de plano de energia existente** e um guia adicional de animações; cada operação declara seu escopo.
 
