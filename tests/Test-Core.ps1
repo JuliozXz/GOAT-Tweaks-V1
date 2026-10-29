@@ -6,9 +6,12 @@ function Assert-Core {param([bool]$Condition,[string]$Name)if(-not $Condition){t
 function Assert-CoreThrows {param([scriptblock]$Code,[string]$Name)$failed=$false;try{&$Code|Out-Null}catch{$failed=$true};Assert-Core $failed $Name}
 function Copy-FixtureState {param($Value) $Value|ConvertTo-Json -Depth 32|ConvertFrom-Json}
 $script:FixtureActions=@(Get-GoatActions)
+$script:OriginalActions=@($script:FixtureActions|ForEach-Object{$_|ConvertTo-Json -Depth 16|ConvertFrom-Json})
+$script:FixtureContext=[pscustomobject]@{Build=19045;WindowsMajor=10;ProductType=1;Architecture='AMD64';Is64BitProcess=$true;Edition='Professional';IsAdmin=$true;Managed=$false;RemoteState='LOCAL_CONSOLE';Source='FIXTURE'}
 $script:FixtureRegistry=@{};$script:FixtureWrites=@();$script:FixtureFailure='';$script:FixtureIdentity=[pscustomobject]@{Machine='MACHINE-FIXTURE';Sid='SID-FIXTURE'}
 foreach($action in $script:FixtureActions){$action.ReleaseEnabled=$true;$action.Status='IMPLEMENTED_AND_TESTED'}
 function Get-GoatActions {$script:FixtureActions}
+function Get-GoatActionContext {param($Session);Copy-FixtureState $script:FixtureContext}
 function Get-GoatIdentity {Copy-FixtureState $script:FixtureIdentity}
 function Read-GoatRegistry {param($Target)if($script:FixtureRegistry.ContainsKey($Target.Id)){Copy-FixtureState $script:FixtureRegistry[$Target.Id]}else{[pscustomobject]@{KeyExists=$true;Exists=$false;Kind=$null;Data=$null}}}
 function Write-GoatRegistry {
@@ -18,6 +21,7 @@ function Write-GoatRegistry {
     $recorded=@($journals|ForEach-Object Steps|Where-Object {$_.Id -eq $Target.Id -and $_.State -in @('Applying','Restoring')})
     if($recorded.Count -eq 0){throw 'No durable journal before fixture write'}
     $script:FixtureWrites+=($Target.Id+':'+[bool]$State.Exists+':'+[string]$State.Data)
+    if($script:FixtureFailure -eq 'beforewrite'){$script:FixtureFailure='';throw 'Fixture access denied before first write'}
     if($script:FixtureFailure -eq 'rollback' -and $State.Kind -ne 'DWord'){throw 'Fixture rollback failure'}
     if($script:FixtureFailure -eq 'partial' -and $Target.Id -eq 'explorer-show-hidden' -and $State.Kind -eq 'DWord'){
         $script:FixtureRegistry[$Target.Id]=Copy-FixtureState $State
@@ -108,6 +112,9 @@ try {
     $script:FixtureFailure='readback'
     Assert-CoreThrows {Invoke-GoatActionBatch -Session $session -Ids explorer-show-extensions -Consent} 'readback mismatch fails batch'
     Assert-Core (Test-GoatStateEqual (Read-GoatRegistry $script:FixtureActions[0]) $beforeA) 'readback failure restored original'
+    $script:FixtureFailure='beforewrite';$writes=$script:FixtureWrites.Count
+    Assert-CoreThrows {Invoke-GoatActionBatch -Session $session -Ids explorer-show-extensions -Consent} 'pre-mutation write denial surfaces'
+    Assert-Core ($script:FixtureWrites.Count -eq ($writes+1) -and (Test-GoatStateEqual (Read-GoatRegistry $script:FixtureActions[0]) $beforeA) -and @(Get-GoatPendingTransactions $session $script:FixtureIdentity).Count -eq 0) 'unchanged original is verified without unnecessary rollback writes'
     $script:FixtureFailure='rollback'
     Assert-CoreThrows {Invoke-GoatActionBatch -Session $session -Ids explorer-show-extensions -Consent} 'rollback failure surfaces'
     $failed=@(Get-GoatTransactions $session|Where-Object State -eq RestoreFailed)[0]
@@ -148,6 +155,66 @@ try {
     Assert-CoreThrows {Restore-GoatTransaction $session $older.Id -Consent} 'restore order is enforced across sibling sessions'
     $script:ActiveSession=$other;Restore-GoatTransaction $other $newer.Id -Consent|Out-Null
     $script:ActiveSession=$session;Restore-GoatTransaction $session $older.Id -Consent|Out-Null
+    $native=@($script:OriginalActions|Where-Object ExecutorKind -eq 'RegistryValue')
+    Assert-Core ($native.Count -ge 12) 'at least twelve native executors have explicit fixed registry targets'
+    foreach($action in $native){
+        Assert-Core ($action.ReleaseEnabled -and $action.Status -eq 'IMPLEMENTED_AND_TESTED' -and $action.ValidationScope -match 'HKCU' -and @($action.Sources).Count -gt 0) ('metadata declares executor validation scope and sources '+$action.Id)
+        $script:FixtureContext.Build=if($action.MaxBuild -gt 0){$action.MaxBuild}else{[Math]::Max(26100,$action.MinBuild)}
+        foreach($direction in @('On','Off')){
+            $original=[pscustomobject]@{KeyExists=$true;Exists=$true;Kind='String';Data=('ORIGINAL-'+$action.Id)}
+            $script:FixtureRegistry[$action.Id]=Copy-FixtureState $original
+            $tx=Invoke-GoatActionBatch -Session $session -Ids $action.Id -Direction $direction -Consent -ApprovedActionIds @($action.Id)
+            Assert-Core ($tx.State -eq 'Applied' -and (Read-GoatRegistry $action).Data -eq $action.$direction) ('native apply and readback '+$action.Id+'/'+$direction)
+            Restore-GoatTransaction $session $tx.Id -Consent|Out-Null
+            Assert-Core (Test-GoatStateEqual (Read-GoatRegistry $action) $original) ('native restores exact prior kind/data '+$action.Id+'/'+$direction)
+        }
+        $script:FixtureFailure='readback'
+        Assert-CoreThrows {Invoke-GoatActionBatch -Session $session -Ids $action.Id -Consent -ApprovedActionIds @($action.Id)} ('native failure surfaces '+$action.Id)
+        Assert-Core (Test-GoatStateEqual (Read-GoatRegistry $action) $original) ('native failure rollback verifies '+$action.Id)
+    }
+    $script:FixtureContext.Build=26100
+    $policy=@($script:FixtureActions|Where-Object Id -eq 'capture-recording-policy')[0]
+    $preview=@(Get-GoatActionPreview -Session $session -Ids $policy.Id -InspectOnly)[0]
+    Assert-Core (-not $preview.ExecutionAllowed -and $preview.EffectiveState -eq 'UNKNOWN') 'Windows11 capture policy stays ineligible and effective state is never inferred'
+    $script:FixtureContext.Build=19045;$script:FixtureContext.IsAdmin=$false
+    Assert-CoreThrows {Invoke-GoatActionBatch $session @($policy.Id) -Consent -ApprovedActionIds @($policy.Id)} 'HKLM action requires elevation even with explicit approval'
+    $script:FixtureContext.IsAdmin=$true;$script:FixtureContext.Edition='Core'
+    Assert-CoreThrows {Invoke-GoatActionBatch $session @($policy.Id) -Consent -ApprovedActionIds @($policy.Id)} 'unsupported Home edition cannot apply Pro policy'
+    $script:FixtureContext.Edition='Professional';$script:FixtureContext.Managed=$true
+    Assert-CoreThrows {Invoke-GoatActionBatch $session @($policy.Id) -Consent -ApprovedActionIds @($policy.Id)} 'managed computer policy gate cannot be bypassed by action approval'
+    $script:FixtureContext.Managed=$false;$script:FixtureContext.RemoteState='REMOTE_OR_POSSIBLE_REMOTE'
+    Assert-CoreThrows {Invoke-GoatActionBatch $session @($policy.Id) -Consent -ApprovedActionIds @($policy.Id)} 'capture policy blocked in remote or uncertain context'
+    $script:FixtureContext.RemoteState='LOCAL_CONSOLE'
+    Assert-CoreThrows {Invoke-GoatActionBatch $session @($policy.Id) -Consent} 'approval-class action requires approval of its exact ID'
+    Assert-CoreThrows {Invoke-GoatActionBatch $session @($policy.Id,'explorer-show-hidden') -Consent -ApprovedActionIds @($policy.Id)} 'individual action cannot be mixed into a batch'
+    $safeIds=@($native|Where-Object ExecutionClass -eq 'A_AUTO_SAFE'|Select-Object -First 8 -ExpandProperty Id)
+    Assert-CoreThrows {Invoke-GoatActionBatch $session $safeIds -Consent} 'batch hard limit is seven even for low-risk preferences'
+    $script:FixtureContext.Architecture='ARM64'
+    Assert-CoreThrows {Invoke-GoatActionBatch $session @('explorer-show-hidden') -Consent} 'unsupported architecture blocks real executor'
+    $script:FixtureContext.Architecture='AMD64';$script:FixtureContext.ProductType=3
+    Assert-CoreThrows {Invoke-GoatActionBatch $session @('explorer-show-hidden') -Consent} 'Windows Server does not pass client support gate'
+    $script:FixtureContext.ProductType=1;$script:FixtureContext.Build=$null
+    Assert-CoreThrows {Invoke-GoatActionBatch $session @('explorer-show-hidden') -Consent} 'unknown build cannot become eligible'
+    $script:FixtureContext.Build=19045
+    Assert-CoreThrows {Invoke-GoatActionBatch $session @('ui-taskbar-animations-guide') -Consent} 'manual animation guide is included but never executable'
+    $legacy=Copy-FixtureState $transaction;$legacy.PSObject.Properties.Remove('Approval');$legacy.Steps[0].Target.PSObject.Properties.Remove('Kind');$legacy.Steps[0].Target.PSObject.Properties.Remove('ExecutorKind')
+    Assert-GoatTransaction $legacy $script:FixtureIdentity
+    Assert-Core $true '7.3.0 exact-target DWORD journals remain valid without new target metadata'
+    $reviewed=@(Get-GoatActionPreview $session @('explorer-show-extensions'))
+    $changedAfterPreview=[pscustomobject]@{KeyExists=$true;Exists=$true;Kind='String';Data='changed after consent preview'}
+    $script:FixtureRegistry['explorer-show-extensions']=$changedAfterPreview;$writes=$script:FixtureWrites.Count
+    Assert-CoreThrows {Invoke-GoatActionBatch $session @('explorer-show-extensions') -Consent -ReviewedPreview $reviewed} 'reviewed preview detects changed state before the first write'
+    Assert-Core ($script:FixtureWrites.Count -eq $writes -and (Test-GoatStateEqual (Read-GoatRegistry $script:FixtureActions[0]) $changedAfterPreview)) 'preview mismatch preserves the externally changed preference'
+    $script:FixturePowerPending=$true
+    function Get-GoatPowerPendingTransactions {param($Session,$Identity);if($script:FixturePowerPending){[pscustomobject]@{State='Applying';Identity=$Identity}}}
+    $writes=$script:FixtureWrites.Count
+    Assert-CoreThrows {Invoke-GoatActionBatch $session @('explorer-show-extensions') -Consent} 'interrupted power transaction blocks new registry batch'
+    Assert-Core ($script:FixtureWrites.Count -eq $writes) 'cross-engine pending gate runs before any registry write'
+    $script:FixturePowerPending=$false
+    $reviewed=@(Get-GoatActionPreview $session @('explorer-show-extensions'))
+    $anotherSession=New-GoatSession -Root $root;$writes=$script:FixtureWrites.Count
+    Assert-CoreThrows {Invoke-GoatActionBatch $anotherSession @('explorer-show-extensions') -Consent -ReviewedPreview $reviewed} 'identical target and state cannot reuse a preview from another session'
+    Assert-Core ($script:FixtureWrites.Count -eq $writes -and $reviewed[0].SessionId -eq $session.Id) 'preview session binding is checked before journal or registry write'
     $malformed=Join-Path $session.Root 'transactions\malformed.json';[IO.File]::WriteAllText($malformed,'{broken')
     Assert-CoreThrows {Invoke-GoatActionBatch -Session $session -Ids explorer-show-hidden -Consent} 'malformed journal blocks new action'
     [IO.File]::SetAttributes($malformed,[IO.FileAttributes]::Hidden)

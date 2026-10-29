@@ -99,15 +99,64 @@ function Add-GoatEvent {
     Save-GoatSession $Session
 }
 function Get-GoatActions {
-    # These are preferences, never advertised as FPS optimizations. Mutation release
-    # is intentionally gated until the documented VM/physical matrix is completed.
-    @(
-        [pscustomobject]@{Id='explorer-show-extensions';Title='Mostrar extensões de arquivos';Path='Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced';Name='HideFileExt';On=0;Off=1;Risk='Baixo / preferência';Reboot=$false;Benefit='Ajuda a identificar tipos de arquivo; FPS não medido.'},
-        [pscustomobject]@{Id='explorer-show-hidden';Title='Mostrar arquivos ocultos';Path='Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced';Name='Hidden';On=1;Off=2;Risk='Baixo / preferência';Reboot=$false;Benefit='Inspeção técnica; arquivos de sistema protegidos permanecem protegidos.'}
-    ) | ForEach-Object {
-        $_ | Add-Member Hive 'CurrentUser' -PassThru | Add-Member View 'Registry64' -PassThru |
-            Add-Member Status 'IMPLEMENTED_NOT_VALIDATED' -PassThru | Add-Member ReleaseEnabled $false -PassThru
+    # Hard-coded native allow-list. No catalog or document text creates executors.
+    $folderSource='https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-gppref/3c837e92-016e-4148-86e5-b4f0381a757f'
+    $commonSource='https://learn.microsoft.com/en-us/windows/apps/develop/settings/settings-common#personalization---colors'
+    $gamingSource='https://learn.microsoft.com/en-us/windows/apps/develop/settings/settings-windows-11#gaming-game-bar-game-mode-gaming-shortcuts'
+    $explorerSource='https://learn.microsoft.com/en-us/windows/client-management/mdm/policy-csp-admx-windowsexplorer'
+    $advanced='Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
+    $personalize='Software\Microsoft\Windows\CurrentVersion\Themes\Personalize'
+    $specs=@(
+        @{Id='explorer-show-extensions';Title='Mostrar extensões de arquivos';Path=$advanced;Name='HideFileExt';On=0;Off=1;Category='Explorer';Description='Preferência de exibição de extensões conhecidas.';Tradeoffs='Ocultar extensões pode dificultar identificar o tipo real do arquivo.';Sources=@($folderSource)},
+        @{Id='explorer-show-hidden';Title='Mostrar arquivos ocultos';Path=$advanced;Name='Hidden';On=1;Off=2;Category='Explorer';Description='Exibe arquivos marcados como ocultos sem alterar a proteção de arquivos do sistema.';Tradeoffs='Aparecerão mais arquivos e pastas; não exclua itens desconhecidos.';Sources=@($folderSource)},
+        @{Id='explorer-show-infotips';Title='Mostrar descrições no Explorer';Path=$advanced;Name='ShowInfoTip';On=1;Off=0;Category='Explorer';Description='Preferência para dicas textuais de arquivos e pastas.';Tradeoffs='Dicas podem ocupar a área sob o ponteiro; benefício de FPS não medido.';Sources=@($folderSource)},
+        @{Id='explorer-color-compressed';Title='Destacar arquivos compactados ou criptografados';Path=$advanced;Name='ShowCompColor';On=1;Off=0;Category='Explorer';Description='Preferência visual para distinguir atributos NTFS por cor.';Tradeoffs='Pode conflitar com a preferência visual ou percepção de cores do cliente.';Sources=@($folderSource)},
+        @{Id='explorer-folder-size-tips';Title='Informações de tamanho nas dicas de pastas';Path=$advanced;Name='FolderContentsInfoTip';On=1;Off=0;Category='Explorer';Description='Preferência de detalhes nas dicas de pastas.';Tradeoffs='A coleta de tamanho pode custar tempo em pastas grandes ou remotas.';Sources=@($folderSource)},
+        @{Id='explorer-full-title-path';Title='Caminho completo no título do Explorer';Path='Software\Microsoft\Windows\CurrentVersion\Explorer\CabinetState';Name='FullPath';On=1;Off=0;Category='Explorer';Description='Preferência para identificar a pasta pelo caminho no título.';Tradeoffs='O caminho pessoal pode ficar visível em compartilhamento de tela.';Sources=@($folderSource)},
+        @{Id='explorer-separate-process';Title='Janelas de pastas em processo separado';Path=$advanced;Name='SeparateProcess';On=1;Off=0;Category='Explorer';Description='Preferência de isolamento das janelas do Explorer.';Tradeoffs='Pode aumentar uso de memória; requer reabrir janelas para avaliar. O app não encerra o Explorer.';ExecutionClass='B_APPROVAL';RequiresIndividualApproval=$true;BlockRemote=$true;Sources=@($folderSource)},
+        @{Id='ui-transparency';Title='Efeitos de transparência';Path=$personalize;Name='EnableTransparency';On=1;Off=0;Category='Interface';Description='Persiste a preferência de transparência das superfícies do Windows.';Tradeoffs='Troca estética e legibilidade; não comprova redução de carga ou ganho em jogos.';CatalogIds=@('WIN-TRANSPARENCY');Sources=@($commonSource)},
+        @{Id='ui-apps-light-theme';Title='Tema claro dos aplicativos';Path=$personalize;Name='AppsUseLightTheme';On=1;Off=0;Category='Interface';Description='Escolhe a preferência claro/escuro dos aplicativos compatíveis.';Tradeoffs='Aplicativos podem ignorar o tema; confirmar conforto e acessibilidade com o cliente.';Sources=@($commonSource)},
+        @{Id='ui-system-light-theme';Title='Tema claro do Windows';Path=$personalize;Name='SystemUsesLightTheme';On=1;Off=0;Category='Interface';Description='Escolhe a preferência claro/escuro do shell.';Tradeoffs='Pode mudar contraste percebido. Nenhum aplicativo é reiniciado automaticamente.';Sources=@($commonSource)},
+        @{Id='ui-titlebar-accent';Title='Cor de destaque nas bordas e títulos';Path='Software\Microsoft\Windows\DWM';Name='ColorPrevalence';On=1;Off=0;Category='Interface';Description='Preferência visual de cor em títulos e bordas de janelas.';Tradeoffs='Nem todas as janelas usam essa preferência; não mede desempenho.';Sources=@($commonSource)},
+        @{Id='ui-auto-accent';Title='Escolher cor de destaque automaticamente';Path='Control Panel\Desktop';Name='AutoColorization';On=1;Off=0;Category='Interface';Description='Preferência de escolha automática da cor a partir do fundo.';Tradeoffs='Não muda o papel de parede; efeito visual depende do tema.';Sources=@($commonSource)},
+        @{Id='gaming-game-mode';Title='Preferência de Modo de Jogo';Path='Software\Microsoft\GameBar';Name='AutoGameModeEnabled';On=1;Off=0;Category='Jogos';Description='Persiste a preferência de Modo de Jogo documentada para Windows 11.';Tradeoffs='Não prova que o jogo está usando otimizações nem promete FPS. Testar uma variável por vez.';MinBuild=22000;ExecutionClass='B_APPROVAL';RequiresIndividualApproval=$true;CatalogIds=@('WIN-GAMEMODE','WIN-GAME-MODE','WIN-001');Sources=@($gamingSource)},
+        @{Id='gaming-controller-gamebar';Title='Permitir abrir Game Bar pelo controle';Path='Software\Microsoft\GameBar';Name='UseNexusForGameBarEnabled';On=1;Off=0;Category='Jogos';Description='Preferência do botão do controle para abrir Game Bar, conforme Windows 11.';Tradeoffs='Desativar este atalho não desinstala Game Bar nem desativa todos os tipos de captura.';MinBuild=22000;ExecutionClass='B_APPROVAL';RequiresIndividualApproval=$true;Sources=@($gamingSource)},
+        @{Id='capture-recording-policy';Title='Permitir gravação e transmissão do Windows (política Win10)';Hive='LocalMachine';Path='Software\Policies\Microsoft\Windows\GameDVR';Name='AllowGameDVR';On=1;Off=0;Category='Captura';Description='Configura a política de permissão da gravação do Windows em Windows 10 desktop suportado.';Tradeoffs='Desativar pode interromper gravação/transmissão desejadas. A Microsoft não garante aplicação desta política no Windows 11. Não desinstala componentes.';RequiresAdmin=$true;MinBuild=19041;MaxBuild=19045;SupportedEditions=@('Professional','ProfessionalN','ProfessionalEducation','ProfessionalWorkstation','Enterprise','EnterpriseS','Education','IoTEnterprise','IoTEnterpriseS');BlockWhenManaged=$true;BlockRemote=$true;ExecutionClass='B_APPROVAL';RequiresIndividualApproval=$true;CatalogIds=@('WIN-CAPTURE','WIN-002','APP-XBOX-CAPTURE-BACKGROUND');Sources=@('https://learn.microsoft.com/en-us/windows/client-management/mdm/policy-csp-applicationmanagement#allowgamedvr')},
+        @{Id='explorer-confirm-delete';Title='Confirmar envio de arquivos à Lixeira';Path='Software\Microsoft\Windows\CurrentVersion\Policies\Explorer';Name='ConfirmFileDelete';On=1;Off=0;Category='Explorer';Description='Política para confirmar exclusões enviadas à Lixeira; não remove nenhum arquivo.';Tradeoffs='A política pode limitar a escolha pela interface. Não altera a exclusão permanente nem recupera arquivos já apagados.';MinBuild=22000;SupportedEditions=@('Professional','ProfessionalN','ProfessionalEducation','ProfessionalWorkstation','Enterprise','EnterpriseS','Education','IoTEnterprise','IoTEnterpriseS');BlockWhenManaged=$true;ExecutionClass='B_APPROVAL';RequiresIndividualApproval=$true;Sources=@($explorerSource+'#confirmfiledelete')}
+    )
+    foreach($spec in $specs){
+        $action=[ordered]@{Id=$spec.Id;Version=1;Title=$spec.Title;Description=$spec.Description;Category=$spec.Category;Hive='CurrentUser';View='Registry64';Path=$spec.Path;Name=$spec.Name;Kind='DWord';On=$spec.On;Off=$spec.Off;Risk='Baixo / preferência';RiskClass='Low';risk_class='Low';Effects='Preferência persistida; estado efetivo requer conferir a interface do Windows.';Tradeoffs=$spec.Tradeoffs;Benefit='Preferência funcional/visual; ganho de FPS não medido.';RequiresAdmin=$false;RequiresReboot=$null;Reboot=$false;Activation='Pode exigir nova sessão ou reabrir a interface; nunca há reinício automático.';ExecutionClass='A_AUTO_SAFE';RequiresIndividualApproval=$false;BlockRemote=$false;BlockWhenManaged=$false;MinBuild=19041;MaxBuild=0;SupportedEditions=@();CatalogIds=@();Sources=$spec.Sources;ExecutorKind='RegistryValue';Status='IMPLEMENTED_AND_TESTED';ReleaseEnabled=$true;Released=$true;ValidationScope='PS5.1: aplicação, read-back, falhas e restauração com fixtures; API real de Registro somente em chave HKCU descartável. Efeito nas preferências e desempenho em hardware não certificado.';Verification='Read-back exato de presença/tipo/dados no Registro; estado efetivo do Windows permanece não confirmado.';Rollback='Restaurar presença, tipo e dados capturados; não remover a chave pai.'}
+        foreach($key in $spec.Keys){$action[$key]=$spec[$key]}
+        if($action.ExecutionClass -eq 'B_APPROVAL'){$action.Risk='Moderado / mudança com trade-off';$action.RiskClass='Medium';$action.risk_class='Medium'}
+        [pscustomobject]$action
     }
+    [pscustomobject]@{Id='ui-taskbar-animations-guide';Version=1;Title='Animações da barra de tarefas — guia';Description='Consultar Acessibilidade > Efeitos visuais e conferir o controle disponível no Windows.';Category='Interface';Hive=$null;View=$null;Path=$null;Name=$null;Kind=$null;On=$null;Off=$null;Risk='Preferência visual / procedimento manual';RiskClass='Low';risk_class='Low';Effects='Nenhuma escrita pelo app.';Tradeoffs='Não foi confirmada uma API pública de escrita ou contrato atual para TaskbarAnimations.';Benefit='Conforto visual; FPS não medido.';RequiresAdmin=$false;RequiresReboot=$null;Reboot=$false;ExecutionClass='C_MANUAL';RequiresIndividualApproval=$false;BlockRemote=$false;BlockWhenManaged=$false;MinBuild=19041;MaxBuild=0;SupportedEditions=@();CatalogIds=@('WIN-ANIMATION','WIN-VISUAL-EFFECTS');Sources=@('https://support.microsoft.com/en-us/accessibility/windows/make-it-easier-to-focus-on-tasks');ExecutorKind='ManualGuide';Status='MANUAL_GUIDE';ReleaseEnabled=$false;Released=$false;ValidationScope='Guia consultivo; não é executor nativo.';Verification='Verificação manual em Configurações.';Rollback='Anotar e restaurar o valor original pela interface do Windows.'}
+}
+function Get-GoatActionContext {
+    param($Session)
+    $build=$null;$version=$null;$productType=$null;$edition=$null;$managed=$null;$issues=@()
+    try{$os=Get-CimInstance -ClassName Win32_OperatingSystem -OperationTimeoutSec 6 -ErrorAction Stop;$build=[int]$os.BuildNumber;$version=[version]$os.Version;$productType=[int]$os.ProductType}catch{$issues+='Windows/build indisponível: '+$_.Exception.Message}
+    try{$edition=[Microsoft.Win32.Registry]::GetValue('HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion','EditionID',$null)}catch{$issues+='Edição indisponível.'}
+    try{$computer=Get-CimInstance -ClassName Win32_ComputerSystem -OperationTimeoutSec 6 -ErrorAction Stop;$managed=[bool]$computer.PartOfDomain;$base=[Microsoft.Win32.RegistryKey]::OpenBaseKey([Microsoft.Win32.RegistryHive]::LocalMachine,[Microsoft.Win32.RegistryView]::Registry64);try{$mdm=$base.OpenSubKey('SOFTWARE\Microsoft\Provisioning\OMADM\Accounts',$false);if($mdm){try{if($mdm.SubKeyCount -gt 0){$managed=$true}}finally{$mdm.Dispose()}}}finally{$base.Dispose()}}catch{$managed=$null;$issues+='Gerenciamento corporativo não confirmado.'}
+    $admin=$false;try{$admin=([Security.Principal.WindowsPrincipal]::new([Security.Principal.WindowsIdentity]::GetCurrent())).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)}catch{$issues+='Elevação não confirmada.'}
+    $remote='UNKNOWN'
+    if($Session.Mode -eq 'Remoto'){$remote='REMOTE_OR_POSSIBLE_REMOTE'}elseif(Get-Command Get-GoatGpuRemoteContext -ErrorAction SilentlyContinue){$remote=[string](Get-GoatGpuRemoteContext).State}elseif($env:SESSIONNAME -eq 'Console'){$remote='LOCAL_CONSOLE'}
+    [pscustomobject]@{Build=$build;WindowsMajor=$(if($version){$version.Major}else{$null});ProductType=$productType;Architecture=$env:PROCESSOR_ARCHITECTURE;Is64BitProcess=[Environment]::Is64BitProcess;Edition=[string]$edition;IsAdmin=$admin;Managed=$managed;RemoteState=$remote;Source='Win32_OperatingSystem + Win32_ComputerSystem + Windows registry + token';Issues=$issues}
+}
+function Get-GoatActionEligibility {
+    param($Action,$Context,[switch]$Demo)
+    $reasons=New-Object 'System.Collections.Generic.List[string]'
+    if($Action.ExecutorKind -ne 'RegistryValue'){$reasons.Add('Procedimento manual sem executor de Registro.')}
+    if(-not $Action.ReleaseEnabled -or $Action.Status -ne 'IMPLEMENTED_AND_TESTED'){$reasons.Add('Executor sem liberação de código/testes.')}
+    if(-not $Demo){
+        if($Context.WindowsMajor -ne 10 -or $Context.ProductType -ne 1 -or $Context.Build -lt $Action.MinBuild -or ($Action.MaxBuild -gt 0 -and $Context.Build -gt $Action.MaxBuild)){$reasons.Add('Windows cliente/build fora do escopo documentado ou desconhecido.')}
+        if(-not $Context.Is64BitProcess -or $Context.Architecture -ne 'AMD64'){$reasons.Add('Aplicação real requer Windows/PowerShell x64.')}
+        if($Action.RequiresAdmin -and -not $Context.IsAdmin){$reasons.Add('Requer processo elevado na conta apropriada.')}
+        if(@($Action.SupportedEditions).Count -gt 0 -and $Context.Edition -notin $Action.SupportedEditions){$reasons.Add('Edição não suportada por esta política ou não confirmada.')}
+        if($Action.BlockWhenManaged -and $Context.Managed -ne $false){$reasons.Add('Política em máquina gerenciada ou gerenciamento desconhecido: usar administração responsável.')}
+        if($Action.BlockRemote -and $Context.RemoteState -ne 'LOCAL_CONSOLE'){$reasons.Add('Mudança bloqueada durante acesso remoto ou contexto não confirmado.')}
+    }
+    [pscustomobject]@{Eligible=($reasons.Count -eq 0);Reasons=@($reasons.ToArray());Scope='REGISTRY_PREFERENCE_ONLY';EffectiveState='UNKNOWN';PerformanceGain='NOT_MEASURED';Context=$Context}
 }
 function Read-GoatRegistry {
     param($Target)
@@ -136,7 +185,7 @@ function Write-GoatRegistry {
         $key=$base.CreateSubKey([string]$Target.Path)
         try {
             $data=switch ([string]$State.Kind) {
-                Binary { [byte[]]@($State.Data) }; MultiString { [string[]]@($State.Data) }
+                Binary { ,([byte[]]@($State.Data)) }; MultiString { ,([string[]]@($State.Data)) }
                 DWord { [int]$State.Data }; QWord { [long]$State.Data }
                 String { [string]$State.Data }; ExpandString { [string]$State.Data }
                 default { throw 'Tipo de Registro não suportado.' }
@@ -223,15 +272,23 @@ function Get-GoatActionPreview {
     $persisted=Get-Content -LiteralPath (Join-Path $Session.Root 'session.json') -Raw -Encoding UTF8|ConvertFrom-Json -ErrorAction Stop
     if($persisted.Id -cne $Session.Id -or $persisted.State -ne 'Open'){throw 'A sessão persistida foi encerrada ou está em outra operação. Reabra o atendimento antes de continuar.'}
     if (@($Ids).Count -eq 0 -or @($Ids | Select-Object -Unique).Count -ne @($Ids).Count) { throw 'Seleção vazia ou duplicada.' }
+    if(-not $InspectOnly -and @($Ids).Count -gt 7){throw 'O lote revisável permite no máximo sete ações.'}
+    $context=if($Session.Demo){[pscustomobject]@{Source='DEMO';RemoteState='DEMO'}}else{Get-GoatActionContext $Session}
     foreach ($id in $Ids) {
         $action=@(Get-GoatActions | Where-Object Id -eq $id)
         if ($action.Count -ne 1) { throw ('Ação desconhecida: '+$id) }
         $action=$action[0]
-        $allowed=($Session.Demo -or ($action.ReleaseEnabled -and $action.Status -eq 'IMPLEMENTED_AND_TESTED'))
-        if (-not $allowed -and -not $InspectOnly) { throw 'Ação aguardando validação de bancada. Disponível apenas para simulação.' }
-        $before=if($Session.Demo){[pscustomobject]@{KeyExists=$true;Exists=$false;Kind=$null;Data=$null}}else{Read-GoatRegistry $action}
-        $proposed=[pscustomobject]@{KeyExists=$true;Exists=$true;Kind='DWord';Data=$action.$Direction}
-        [pscustomobject]@{Id=$id;Action=$action;Before=$before;Proposed=$proposed;Direction=$Direction;Changed=(-not (Test-GoatStateEqual $before $proposed));ExecutionAllowed=$allowed;Note=$(if($allowed){'Revise a prévia antes de aplicar.'}else{'Somente leitura; executor aguardando validação de bancada.'})}
+        $eligibility=Get-GoatActionEligibility $action $context -Demo:$Session.Demo
+        $allowed=[bool]$eligibility.Eligible
+        if (-not $allowed -and -not $InspectOnly) { throw ('Ação não elegível: '+($eligibility.Reasons -join '; ')) }
+        $before=$null;$proposed=$null;$changed=$false
+        if($action.ExecutorKind -eq 'RegistryValue'){
+            $before=if($Session.Demo){[pscustomobject]@{KeyExists=$true;Exists=$false;Kind=$null;Data=$null}}else{Read-GoatRegistry $action}
+            $kind=if($action.Kind){[string]$action.Kind}else{'DWord'}
+            $proposed=[pscustomobject]@{KeyExists=$true;Exists=$true;Kind=$kind;Data=$action.$Direction}
+            $changed=-not (Test-GoatStateEqual $before $proposed)
+        }
+        [pscustomobject]@{SessionId=$Session.Id;Id=$id;Action=$action;Before=$before;Proposed=$proposed;Direction=$Direction;Changed=$changed;ExecutionAllowed=$allowed;Eligibility=$eligibility;EffectiveState='UNKNOWN';Note=$(if($allowed){'Revise a mudança e seus trade-offs. Read-back confirma somente o valor persistido, não efeito visual nem FPS.'}else{'Somente leitura: '+($eligibility.Reasons -join '; ')} )}
     }
 }
 function Assert-GoatTransaction {
@@ -243,13 +300,15 @@ function Assert-GoatTransaction {
     if(@($Transaction.Steps).Count -lt 1 -or @($Transaction.Steps).Count -gt 16 -or @($Transaction.Steps.Id|Select-Object -Unique).Count -ne @($Transaction.Steps).Count){throw 'Etapas ausentes ou duplicadas no diário.'}
     foreach ($step in @($Transaction.Steps)) {
         $allowed=@(Get-GoatActions | Where-Object Id -eq $step.Id)
-        if ($allowed.Count -ne 1) { throw 'Diário contém ação não autorizada.' }
+        if ($allowed.Count -ne 1 -or $allowed[0].ExecutorKind -ne 'RegistryValue') { throw 'Diário contém ação não autorizada.' }
         foreach ($field in @('Hive','View','Path','Name')) {
             if ([string]$allowed[0].$field -cne [string]$step.Target.$field) { throw 'Alvo do diário diverge do executor.' }
         }
         if($step.State -notin @('Prepared','Applying','Applied','Restoring','Restored','RestoreFailed','Unchanged')){throw 'Estado de etapa desconhecido.'}
         Assert-GoatRegistrySnapshot $step.Original;Assert-GoatRegistrySnapshot $step.Proposed
-        if($step.Proposed.Kind -ne 'DWord' -or -not $step.Proposed.Exists -or $step.Proposed.Data -notin @($allowed[0].On,$allowed[0].Off)){throw 'Pós-condição não pertence ao executor autorizado.'}
+        $kind=if($allowed[0].Kind){[string]$allowed[0].Kind}else{'DWord'}
+        $onState=[pscustomobject]@{KeyExists=$true;Exists=$true;Kind=$kind;Data=$allowed[0].On};$offState=[pscustomobject]@{KeyExists=$true;Exists=$true;Kind=$kind;Data=$allowed[0].Off}
+        if(-not (Test-GoatStateEqual $step.Proposed $onState) -and -not (Test-GoatStateEqual $step.Proposed $offState)){throw 'Pós-condição não pertence ao executor autorizado.'}
         if([string]$step.SnapshotSha256 -notmatch '^[a-f0-9]{64}$' -or $step.SnapshotSha256 -cne (Get-GoatSnapshotHash $step)){throw 'Hash do snapshot divergiu. Preserve o diário para análise.'}
         if($step.State -eq 'Unchanged' -and -not (Test-GoatStateEqual $step.Original $step.Proposed)){throw 'Etapa sem mudança diverge do snapshot.'}
         if($Transaction.State -eq 'Applied' -and $step.State -notin @('Applied','Unchanged')){throw 'Transação aplicada contém etapa não verificada.'}
@@ -266,7 +325,9 @@ function Undo-GoatTransactionInternal {
         if ($step.State -in @('Applying','Applied','Restoring','RestoreFailed')) {
             try {
                 $step.State='Restoring'; Write-GoatJson $Transaction $Path
-                Write-GoatRegistry $step.Target $step.Original
+                # An apply denied before its first write may already equal the
+                # original. Verify that fact instead of forcing another write.
+                if(-not (Test-GoatStateEqual (Read-GoatRegistry $step.Target) $step.Original)){Write-GoatRegistry $step.Target $step.Original}
                 if (-not (Test-GoatStateEqual (Read-GoatRegistry $step.Target) $step.Original)) { throw 'Leitura após reversão divergiu.' }
                 $step.State='Restored'; $step.Error=$null; Write-GoatJson $Transaction $Path
             } catch { $step.State='RestoreFailed';$step.Error=$_.Exception.Message;$failures+=$_.Exception.Message;Write-GoatJson $Transaction $Path }
@@ -276,11 +337,19 @@ function Undo-GoatTransactionInternal {
     Write-GoatJson $Transaction $Path
     if ($failures.Count) { throw ('Reversão incompleta. Preserve diário: '+($failures -join '; ')) }
 }
+function Assert-GoatBatchApproval {
+    param([object[]]$Preview,[string[]]$ApprovedActionIds)
+    foreach($item in $Preview){
+        if($item.Action.ExecutionClass -eq 'B_APPROVAL' -and $item.Id -notin $ApprovedActionIds){throw ('Aprovação individual da mudança necessária: '+$item.Id)}
+        if($item.Action.RequiresIndividualApproval -and $Preview.Count -ne 1){throw 'Esta mudança requer execução individual; remova os demais itens do lote.'}
+    }
+}
 function Invoke-GoatActionBatch {
-    param($Session,[string[]]$Ids,[ValidateSet('On','Off')][string]$Direction='On',[switch]$Consent)
+    param($Session,[string[]]$Ids,[ValidateSet('On','Off')][string]$Direction='On',[switch]$Consent,[string[]]$ApprovedActionIds=@(),[object[]]$ReviewedPreview=@())
     if (-not $Consent) { throw 'Consentimento contextual necessário após revisar a prévia.' }
-    $preview=@(Get-GoatActionPreview $Session $Ids $Direction)
     if ($Session.Demo) {
+        $preview=@(Get-GoatActionPreview $Session $Ids $Direction);Assert-GoatBatchApproval $preview $ApprovedActionIds
+        if($ReviewedPreview.Count -gt 0 -and @($ReviewedPreview|Where-Object SessionId -cne $Session.Id).Count){throw 'A prévia pertence a outra sessão.'}
         Add-GoatEvent $Session 'DEMO' ('Simulação de '+($Ids -join ', ')+'; nenhuma alteração do Windows.')
         return [pscustomobject]@{State='DEMO';Steps=$preview;Message='Simulação concluída; nenhuma alteração do Windows.'}
     }
@@ -292,9 +361,21 @@ function Invoke-GoatActionBatch {
         $identity=Get-GoatIdentity
         $pending=@(Get-GoatPendingTransactions $Session $identity)
         if ($pending.Count) { throw 'Recupere a transação interrompida antes de novas ações.' }
+        if(Get-Command Get-GoatPowerPendingTransactions -ErrorAction SilentlyContinue){
+            if(@(Get-GoatPowerPendingTransactions -Session $Session -Identity $identity).Count){throw 'Recupere a transação de energia interrompida antes de aplicar preferências de Registro.'}
+        }
         # Re-read under the resource lock. The preview does not authorize stale state.
         $preview=@(Get-GoatActionPreview $Session $Ids $Direction)
-        $transaction=[pscustomobject]@{SchemaVersion=1;Id=[guid]::NewGuid().ToString('N');Identity=$identity;CreatedUtc=[DateTime]::UtcNow.ToString('o');State='Prepared';Steps=@()}
+        Assert-GoatBatchApproval $preview $ApprovedActionIds
+        if($ReviewedPreview.Count -gt 0){
+            if($ReviewedPreview.Count -ne $preview.Count){throw 'A seleção diverge da prévia revisada. Gere outra prévia.'}
+            for($index=0;$index -lt $preview.Count;$index++){
+                $reviewed=$ReviewedPreview[$index];$current=$preview[$index]
+                if($reviewed.SessionId -cne $Session.Id -or $reviewed.Id -cne $current.Id -or $reviewed.Direction -cne $current.Direction -or -not $reviewed.ExecutionAllowed -or -not (Test-GoatStateEqual $reviewed.Before $current.Before) -or -not (Test-GoatStateEqual $reviewed.Proposed $current.Proposed)){throw 'A sessão ou o estado mudou após a prévia. Nenhuma alteração foi realizada; revise novamente.'}
+                foreach($field in @('Hive','View','Path','Name')){if([string]$reviewed.Action.$field -cne [string]$current.Action.$field){throw 'O alvo diverge da prévia revisada.'}}
+            }
+        }
+        $transaction=[pscustomobject]@{SchemaVersion=1;Id=[guid]::NewGuid().ToString('N');Identity=$identity;CreatedUtc=[DateTime]::UtcNow.ToString('o');State='Prepared';Steps=@();Approval=[pscustomobject]@{Consent=$true;ApprovedActionIds=@($ApprovedActionIds);Utc=[DateTime]::UtcNow.ToString('o')}}
         foreach ($item in $preview) {
             $step=[pscustomobject]@{Id=$item.Id;Target=($item.Action|ConvertTo-Json -Depth 8|ConvertFrom-Json);Original=($item.Before|ConvertTo-Json -Depth 16|ConvertFrom-Json);Proposed=($item.Proposed|ConvertTo-Json -Depth 16|ConvertFrom-Json);State='Prepared';Error=$null;SnapshotSha256=$null}
             Assert-GoatRegistrySnapshot $step.Original;Assert-GoatRegistrySnapshot $step.Proposed

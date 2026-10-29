@@ -33,7 +33,7 @@ try {
     $json=$report|ConvertTo-Json -Depth 32
     Assert-Report ($json -notmatch 'PRIVATE-(HOST|SERIAL|PNP|NAME|TOKEN|SECRET|SID)' -and $json -notmatch 'C:\\Users') 'public projection redacts identity paths and secret fields'
     Assert-Report ($report.Hardware.GPUs[0].Vendor -eq 'NVIDIA' -and $report.Benchmarks[0].Metrics.AverageFps -eq 60) 'public report preserves useful hardware and evidence'
-    Assert-Report ($report.Version -eq '7.3.0' -and $report.Benchmarks[0].SourceSha256 -eq $sourceHash -and $report.Benchmarks[0].IntervalUnits -eq 'ms') 'official report version and actual capture provenance retained'
+    Assert-Report ($report.Version -eq (Get-Content -LiteralPath (Join-Path $project 'VERSION') -Raw).Trim() -and $report.Benchmarks[0].SourceSha256 -eq $sourceHash -and $report.Benchmarks[0].IntervalUnits -eq 'ms') 'official report version and actual capture provenance retained'
     $exports=Join-Path $root 'exports'
     $export=Export-GoatService $session $exports
     Assert-Report (Test-GoatExport $export) 'export verifies hashes for report and private recovery'
