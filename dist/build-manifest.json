@@ -1,0 +1,50 @@
+{
+    "Version":  "7.3.0-preview",
+    "BundleSha256":  "2df92fec1391574820e3712960b72be2a47772965f61a0a62b21e2232e383e6f",
+    "Sources":  [
+                    {
+                        "Path":  "src/Core.ps1",
+                        "Sha256":  "70190EBCE0372E76DCF747EE05D0AEB3A5BC757686B9BF6DD6F284D1CA0B5AE4"
+                    },
+                    {
+                        "Path":  "src/Gpu.ps1",
+                        "Sha256":  "16DE968817C28386B91B4CF0357C5E55760405EA99F2020D060725A72D171C17"
+                    },
+                    {
+                        "Path":  "src/Inventory.ps1",
+                        "Sha256":  "5A269E23A9A42968C914EF1FD45739AE89244EDB2F4F5265F2382DD124474B29"
+                    },
+                    {
+                        "Path":  "src/Benchmark.ps1",
+                        "Sha256":  "4C292F072849D7A6A39FFEBCB336FAE1DD283E2B48179704830F37B87C0D6E72"
+                    },
+                    {
+                        "Path":  "src/Reports.ps1",
+                        "Sha256":  "19FE501695D3B400F4DAC49F1505836860FE2B136C328A158009BD8CD93A8A77"
+                    },
+                    {
+                        "Path":  "src/Presentation.ps1",
+                        "Sha256":  "9971AF49E756E23034B96903875437CB4F08B98F80B1D1328E60E3AE314D599C"
+                    },
+                    {
+                        "Path":  "src/App.ps1",
+                        "Sha256":  "8AEBF237EAD815575968101B1B8B948EA84E2B012C9A80415B545F9B9F944C72"
+                    },
+                    {
+                        "Path":  "src/UI.xaml",
+                        "Sha256":  "B897FF7724BBA27F44CF7B407F85C730717927D1AA77AC288C5F15603EB17016"
+                    },
+                    {
+                        "Path":  "data/catalog.json",
+                        "Sha256":  "57E7647CC967B93D24F4EF46C2BFEC31E4B5FB166704EEDBFE87781903F3A797"
+                    },
+                    {
+                        "Path":  "data/documents.json",
+                        "Sha256":  "3CD6969E3217247BEA7EBD70B44D42A86E0DE72FBF6D726853EC17A7F71CEE8B"
+                    },
+                    {
+                        "Path":  "src/Entry.ps1",
+                        "Sha256":  "9532F5DF75AA726944650D90C03FCFA6DA2775F453956FAECF6388E5F10E8544"
+                    }
+                ]
+}

@@ -1,0 +1,16 @@
+{
+  "date_local": "2026-10-28",
+  "timezone": "America/Sao_Paulo",
+  "engine": "Windows PowerShell 5.1 x64 STA",
+  "suites_passed": 8,
+  "suites_failed": 0,
+  "assertions": 3192,
+  "suite_assertions": { "Benchmark": 48, "Catalog": 2923, "Core": 39, "Gpu": 32, "Inventory": 34, "Presentation": 23, "Reports": 22, "UI": 71 },
+  "bundled_ui_assertions_passed": 71,
+  "navigation_pages": 16,
+  "bundle_sha256": "2df92fec1391574820e3712960b72be2a47772965f61a0a62b21e2232e383e6f",
+  "real_readonly_observation": { "os_build": 19045, "gpu_vendors": ["NVIDIA"], "gpu_count": 1, "monitor_count": 1, "storage_reliability": "UNAVAILABLE" },
+  "real_windows_preferences_modified": false,
+  "pending": ["Windows 11 physical", "AMD physical", "Intel physical", "Mutation and rollback on disposable systems", "Remote failure recovery on physical systems", "Accessibility and DPI matrix", "Publisher signing"],
+  "scope": "Fixtures, WPF Demo workflow, bundled workflow, and one physical Windows read-only inventory. Not performance or hardware certification."
+}

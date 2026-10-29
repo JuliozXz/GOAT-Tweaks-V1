@@ -1,9 +1,5 @@
 artifacts/
-*.log
-*.tmp
-docs/Especificacao-original.txt
-docs/CONTRACT.md
-docs/INTEGRATION-CONTRACT.md
 dist/package/
-dist/*.zip
-*.previous
+*.user
+*.log
+sessions/

@@ -1,0 +1,52 @@
+name: Windows validation
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  powershell:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+
+      - name: Build the single PowerShell app
+        shell: powershell
+        run: ./scripts/Build.ps1
+
+      - name: Fixture, contract and WPF Demo tests
+        shell: powershell
+        run: ./scripts/Test.ps1 -ResultsRoot ./artifacts/test-results
+
+      - name: Verify bundled Demo scan returns honest read-only JSON
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $capture = & powershell.exe -NoProfile -NonInteractive -STA -File ./dist/GOAT-Tweaks.ps1 -Demo -ScanOnly
+          if ($LASTEXITCODE -ne 0) { throw 'Bundled scan failed.' }
+          $data = ($capture -join "`n") | ConvertFrom-Json
+          if ($data.Demo -ne $true -or $data.ReadOnly -ne $true -or $data.Status -ne 'DEMO') {
+            throw 'Bundled Demo scan did not report explicit simulated, read-only data.'
+          }
+          [IO.Directory]::CreateDirectory((Join-Path $PWD 'artifacts')) | Out-Null
+          $capture | Set-Content -LiteralPath ./artifacts/bundled-demo-scan.json -Encoding UTF8
+
+      - name: Run the WPF Demo workflow from the bundled app
+        shell: powershell
+        run: powershell.exe -NoProfile -NonInteractive -STA -File ./tests/Test-UI.ps1 -Bundle ./dist/GOAT-Tweaks.ps1 -ArtifactsRoot ./artifacts/ui-bundled
+
+      - name: Preserve validation logs, UI renders and bundle hashes
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: goat-windows-validation
+          path: |
+            artifacts/
+            dist/
+          if-no-files-found: warn
