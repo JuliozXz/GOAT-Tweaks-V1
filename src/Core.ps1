@@ -1,7 +1,16 @@
 ﻿# GOAT Tweaks: original session, persistence and transaction engine. PS 5.1.
+function Assert-GoatPlainFilePath {
+    param([Parameter(Mandatory=$true)][string]$Path)
+    $current=[IO.Path]::GetFullPath($Path)
+    while($current){
+        if(Test-Path -LiteralPath $current){$item=Get-Item -LiteralPath $current -Force -ErrorAction Stop;if($item.Attributes -band [IO.FileAttributes]::ReparsePoint){throw 'Caminho com link/junction/reparse point bloqueado para preservar o destino exato.'}}
+        $parent=Split-Path $current -Parent;if($parent -eq $current){break};$current=$parent
+    }
+}
 function Write-GoatJson {
     param([Parameter(Mandatory)]$Value,[Parameter(Mandatory)][string]$Path)
     $Path=[IO.Path]::GetFullPath($Path)
+    Assert-GoatPlainFilePath $Path
     $directory = Split-Path -Parent $Path
     [void][IO.Directory]::CreateDirectory($directory)
     $temporary = Join-Path $directory ([guid]::NewGuid().ToString('N') + '.tmp')
@@ -39,7 +48,46 @@ function New-GoatSession {
 }
 function Save-GoatSession {
     param($Session)
-    Write-GoatJson $Session (Join-Path $Session.Root 'session.json')
+    # Never persist the read-only scan merely because it is visible in the UI.
+    # Copy the model so the UI keeps its current inventory in memory.
+    $persisted=$Session|ConvertTo-Json -Depth 64|ConvertFrom-Json
+    if($Session.Consent -isnot [bool] -or -not $Session.Consent){$persisted.Inventory=$null}
+    Write-GoatJson $persisted (Join-Path $Session.Root 'session.json')
+}
+function Import-GoatSession {
+    [CmdletBinding()]
+    param([Parameter(Mandatory=$true)][string]$Path,[switch]$Demo)
+    $file=Get-Item -LiteralPath $Path -ErrorAction Stop
+    Assert-GoatPlainFilePath $file.FullName
+    if($file.PSIsContainer -or $file.Name -ine 'session.json' -or $file.Length -gt 64MB -or ($file.Attributes -band [IO.FileAttributes]::ReparsePoint)){throw 'Selecione um arquivo session.json regular de até 64 MiB.'}
+    $loadMutex=[Threading.Mutex]::new($false,'Local\GOAT-Tweaks-Actions');$loadLocked=$false
+    try {
+    try{$loadLocked=$loadMutex.WaitOne(0)}catch [Threading.AbandonedMutexException]{$loadLocked=$true}
+    if(-not $loadLocked){throw 'Outra operação GOAT está ativa. Aguarde antes de retomar a sessão.'}
+    $session=Get-Content -LiteralPath $file.FullName -Raw -Encoding UTF8|ConvertFrom-Json -ErrorAction Stop
+    if($session -is [array] -or $session.SchemaVersion -ne 1 -or [string]$session.Id -notmatch '^[a-f0-9]{32}$' -or $session.Demo -isnot [bool] -or $session.Consent -isnot [bool] -or $session.State -notin @('Open','Finalizing','Finalized')){throw 'Schema, identidade ou estado da sessão inválido.'}
+    $created=[datetime]::MinValue;if(-not [datetime]::TryParse([string]$session.CreatedUtc,[ref]$created)){throw 'Horário da sessão inválido.'}
+    foreach($field in @('Events','Exports','Profiles','Benchmarks')){if($session.$field -isnot [array]){throw ('Coleção inválida na sessão: '+$field)}}
+    foreach($field in @('Inventory','Root','FinalExport','Comparison','Objective','Mode')){if($null -eq $session.PSObject.Properties[$field]){throw ('Campo ausente na sessão: '+$field)}}
+    if($session.Mode -notin @('Local','Remoto') -or $session.Objective -notin @('Equilibrado','Competitivo','Qualidade')){throw 'Contexto de atendimento inválido.'}
+    if($PSBoundParameters.ContainsKey('Demo') -and $session.Demo -ne [bool]$Demo){throw 'O modo da sessão não corresponde ao modo de execução solicitado.'}
+    $warnings=New-Object 'System.Collections.Generic.List[string]'
+    $session.Root=[IO.Path]::GetFullPath($file.DirectoryName)
+    if(-not $session.Consent -and $null -ne $session.Inventory){$session.Inventory=$null;$warnings.Add('Inventário encontrado sem consentimento de persistência; descartado da sessão carregada.')}
+    # Reading and validating journals also blocks malformed/unknown targets before
+    # the imported model can reach any action handler.
+    @(Get-GoatTransactions $session)|Out-Null
+    if($session.State -eq 'Finalizing'){
+        $verified=$false
+        if($session.FinalExport -and (Get-Command Test-GoatExport -ErrorAction SilentlyContinue)){
+            try{$verified=[bool](Test-GoatExport -Directory $session.FinalExport -ExpectedSessionId $session.Id -RequireFinalized)}catch{$warnings.Add('Exportação de finalização interrompida não validada: '+$_.Exception.Message)}
+        }
+        if($verified){$session.State='Finalized';$warnings.Add('Finalização interrompida reconciliada com pacote íntegro.')}
+        else{$session.State='Open';$warnings.Add('Finalização interrompida: sessão reaberta para revisão. Arquivos parciais e recuperação preservados.')}
+        Save-GoatSession $session
+    }
+    $session|Add-Member RuntimeWarnings @($warnings.ToArray()) -Force -PassThru
+    }finally{if($loadLocked){$loadMutex.ReleaseMutex()};$loadMutex.Dispose()}
 }
 function Add-GoatEvent {
     param($Session,[string]$Kind,[string]$Message)
@@ -104,14 +152,39 @@ function Test-GoatStateEqual {
     if ([string]$A.Kind -cne [string]$B.Kind) { return $false }
     return (($A.Data | ConvertTo-Json -Compress -Depth 8) -ceq ($B.Data | ConvertTo-Json -Compress -Depth 8))
 }
+function Assert-GoatRegistrySnapshot {
+    param($State)
+    if($null -eq $State -or $State.Exists -isnot [bool] -or $State.KeyExists -isnot [bool]){throw 'Snapshot sem flags de presença válidas.'}
+    if(-not $State.Exists){if($null -ne $State.Kind -or $null -ne $State.Data){throw 'Snapshot ausente contém tipo/dados.'};return}
+    if(-not $State.KeyExists){throw 'Snapshot de valor presente exige chave presente.'}
+    if($State.Kind -notin @('String','ExpandString','MultiString','Binary','DWord','QWord')){throw 'Tipo de snapshot inválido.'}
+    switch([string]$State.Kind){
+        {$_ -in @('String','ExpandString')} {if($State.Data -isnot [string]){throw 'Snapshot textual inválido.'}}
+        'MultiString' {if($State.Data -isnot [array] -or @($State.Data|Where-Object{$_ -isnot [string]}).Count){throw 'Snapshot MultiString inválido.'}}
+        'Binary' {if($State.Data -isnot [array]){throw 'Snapshot binário inválido.'};foreach($byte in $State.Data){if($byte -isnot [ValueType] -or [double]$byte -lt 0 -or [double]$byte -gt 255 -or [double]$byte -ne [Math]::Truncate([double]$byte)){throw 'Byte de snapshot inválido.'}}}
+        {$_ -in @('DWord','QWord')} {if($State.Data -isnot [int] -and $State.Data -isnot [long]){throw 'Snapshot inteiro inválido.'};if($_ -eq 'DWord' -and ([long]$State.Data -lt [int]::MinValue -or [long]$State.Data -gt [int]::MaxValue)){throw 'DWord fora da faixa.'}}
+    }
+}
+function Get-GoatSnapshotHash {
+    param($Step)
+    $canonical=[ordered]@{Id=[string]$Step.Id;Hive=[string]$Step.Target.Hive;View=[string]$Step.Target.View;Path=[string]$Step.Target.Path;Name=[string]$Step.Target.Name;Original=[ordered]@{KeyExists=$Step.Original.KeyExists;Exists=$Step.Original.Exists;Kind=$Step.Original.Kind;Data=$Step.Original.Data};Proposed=[ordered]@{KeyExists=$Step.Proposed.KeyExists;Exists=$Step.Proposed.Exists;Kind=$Step.Proposed.Kind;Data=$Step.Proposed.Data}}
+    $bytes=[Text.Encoding]::UTF8.GetBytes(($canonical|ConvertTo-Json -Depth 16 -Compress));$sha=[Security.Cryptography.SHA256]::Create()
+    try{([BitConverter]::ToString($sha.ComputeHash($bytes))).Replace('-','').ToLowerInvariant()}finally{$sha.Dispose()}
+}
 function Get-GoatTransactions {
     param($Session)
     $directory=Join-Path $Session.Root 'transactions'
+    Assert-GoatPlainFilePath $directory
     if (Test-Path -LiteralPath $directory) {
-        foreach ($file in @(Get-ChildItem -LiteralPath $directory -Filter '*.json' -File | Sort-Object Name)) {
+        foreach ($file in @(Get-ChildItem -LiteralPath $directory -Filter '*.json' -File -Force | Sort-Object Name)) {
+            Assert-GoatPlainFilePath $file.FullName
             # A malformed journal must be visible and block changes, never ignored.
             $value=Get-Content -LiteralPath $file.FullName -Raw -Encoding UTF8 | ConvertFrom-Json -ErrorAction Stop
-            $value | Add-Member JournalPath $file.FullName -Force -PassThru
+            if($value.Id -cne $file.BaseName){throw 'Nome do diário diverge do ID da transação.'}
+            Assert-GoatTransaction $value
+            $value | Add-Member JournalPath $file.FullName -Force | Out-Null
+            $value | Add-Member OwnerSessionId $Session.Id -Force | Out-Null
+            $value | Add-Member OwnerSessionRoot $Session.Root -Force -PassThru
         }
     }
 }
@@ -119,17 +192,26 @@ function Get-GoatRelatedTransactions {
     param($Session,$Identity)
     # Journals survive a closed UI/new session. Search sibling GOAT session folders
     # while holding the same mutation mutex, so an interrupted batch stays a gate.
+    $roots=New-Object 'System.Collections.Generic.List[object]'
+    $roots.Add([pscustomobject]@{Id=$Session.Id;Root=[IO.Path]::GetFullPath($Session.Root)})
     $sessionsRoot=Split-Path ([IO.Path]::GetFullPath($Session.Root)) -Parent
-    foreach($folder in @(Get-ChildItem -LiteralPath $sessionsRoot -Directory -ErrorAction Stop)) {
+    $groups=@($sessionsRoot)
+    $groupProperty=$Session.PSObject.Properties['RecoveryGroupRoot']
+    $recoveryRoot=if($groupProperty -and $groupProperty.Value){[IO.Path]::GetFullPath([string]$groupProperty.Value)}else{[IO.Path]::GetFullPath($Session.Root)}
+    if($groupProperty -and $groupProperty.Value){$mainFile=Join-Path $recoveryRoot 'session.json';if([IO.File]::Exists($mainFile)){$main=Get-Content -LiteralPath $mainFile -Raw -Encoding UTF8|ConvertFrom-Json;$roots.Add([pscustomobject]@{Id=$main.Id;Root=$recoveryRoot})}}
+    $embedded=Join-Path $recoveryRoot 'related-sessions';if([IO.Directory]::Exists($embedded)){$groups+=$embedded}
+    foreach($group in $groups){foreach($folder in @(Get-ChildItem -LiteralPath $group -Directory -ErrorAction Stop)) {
+        if($folder.Attributes -band [IO.FileAttributes]::ReparsePoint){throw 'Sessão com redirecionamento de pasta bloqueada.'}
         $sessionFile=Join-Path $folder.FullName 'session.json'
         if(-not [IO.File]::Exists($sessionFile)){continue}
         $owner=Get-Content -LiteralPath $sessionFile -Raw -Encoding UTF8 | ConvertFrom-Json -ErrorAction Stop
         if($owner.SchemaVersion -ne 1 -or $owner.Id -cne $folder.Name){continue}
-        $owner.Root=$folder.FullName
-        foreach($transaction in @(Get-GoatTransactions $owner)) {
-            if($transaction.Identity.Machine -eq $Identity.Machine -and $transaction.Identity.Sid -eq $Identity.Sid){$transaction}
-        }
-    }
+        $roots.Add([pscustomobject]@{Id=$owner.Id;Root=$folder.FullName})
+    }}
+    $seen=New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+    foreach($owner in $roots){if(-not $seen.Add([IO.Path]::GetFullPath($owner.Root))){continue};foreach($transaction in @(Get-GoatTransactions $owner)) {
+        if($transaction.Identity.Machine -eq $Identity.Machine -and $transaction.Identity.Sid -eq $Identity.Sid){$transaction}
+    }}
 }
 function Get-GoatPendingTransactions {
     param($Session,$Identity)
@@ -138,6 +220,8 @@ function Get-GoatPendingTransactions {
 function Get-GoatActionPreview {
     param($Session,[string[]]$Ids,[ValidateSet('On','Off')][string]$Direction='On',[switch]$InspectOnly)
     if ($Session.State -ne 'Open') { throw 'Sessão encerrada. Abra uma nova sessão.' }
+    $persisted=Get-Content -LiteralPath (Join-Path $Session.Root 'session.json') -Raw -Encoding UTF8|ConvertFrom-Json -ErrorAction Stop
+    if($persisted.Id -cne $Session.Id -or $persisted.State -ne 'Open'){throw 'A sessão persistida foi encerrada ou está em outra operação. Reabra o atendimento antes de continuar.'}
     if (@($Ids).Count -eq 0 -or @($Ids | Select-Object -Unique).Count -ne @($Ids).Count) { throw 'Seleção vazia ou duplicada.' }
     foreach ($id in $Ids) {
         $action=@(Get-GoatActions | Where-Object Id -eq $id)
@@ -152,14 +236,25 @@ function Get-GoatActionPreview {
 }
 function Assert-GoatTransaction {
     param($Transaction,$Identity)
-    if ($Transaction.SchemaVersion -ne 1 -or $Transaction.Identity.Machine -ne $Identity.Machine -or $Transaction.Identity.Sid -ne $Identity.Sid) { throw 'Diário pertence a outro Windows/usuário ou schema desconhecido.' }
+    if ($Transaction.SchemaVersion -ne 1 -or [string]$Transaction.Id -notmatch '^[a-f0-9]{32}$' -or [string]::IsNullOrWhiteSpace([string]$Transaction.Identity.Machine) -or [string]::IsNullOrWhiteSpace([string]$Transaction.Identity.Sid)) { throw 'Identidade/schema do diário inválido.' }
+    if($null -ne $Identity -and ($Transaction.Identity.Machine -cne $Identity.Machine -or $Transaction.Identity.Sid -cne $Identity.Sid)){throw 'Diário pertence a outro Windows/usuário.'}
+    if($Transaction.State -notin @('Prepared','Applying','Applied','Restoring','Restored','RestoreFailed')){throw 'Estado de transação desconhecido.'}
+    $timestamp=[datetime]::MinValue;if(-not [datetime]::TryParse([string]$Transaction.CreatedUtc,[ref]$timestamp)){throw 'Horário da transação inválido.'}
+    if(@($Transaction.Steps).Count -lt 1 -or @($Transaction.Steps).Count -gt 16 -or @($Transaction.Steps.Id|Select-Object -Unique).Count -ne @($Transaction.Steps).Count){throw 'Etapas ausentes ou duplicadas no diário.'}
     foreach ($step in @($Transaction.Steps)) {
         $allowed=@(Get-GoatActions | Where-Object Id -eq $step.Id)
         if ($allowed.Count -ne 1) { throw 'Diário contém ação não autorizada.' }
         foreach ($field in @('Hive','View','Path','Name')) {
             if ([string]$allowed[0].$field -cne [string]$step.Target.$field) { throw 'Alvo do diário diverge do executor.' }
         }
-        if ($step.Original.Exists -and $step.Original.Kind -notin @('String','ExpandString','MultiString','Binary','DWord','QWord')) { throw 'Snapshot inválido.' }
+        if($step.State -notin @('Prepared','Applying','Applied','Restoring','Restored','RestoreFailed','Unchanged')){throw 'Estado de etapa desconhecido.'}
+        Assert-GoatRegistrySnapshot $step.Original;Assert-GoatRegistrySnapshot $step.Proposed
+        if($step.Proposed.Kind -ne 'DWord' -or -not $step.Proposed.Exists -or $step.Proposed.Data -notin @($allowed[0].On,$allowed[0].Off)){throw 'Pós-condição não pertence ao executor autorizado.'}
+        if([string]$step.SnapshotSha256 -notmatch '^[a-f0-9]{64}$' -or $step.SnapshotSha256 -cne (Get-GoatSnapshotHash $step)){throw 'Hash do snapshot divergiu. Preserve o diário para análise.'}
+        if($step.State -eq 'Unchanged' -and -not (Test-GoatStateEqual $step.Original $step.Proposed)){throw 'Etapa sem mudança diverge do snapshot.'}
+        if($Transaction.State -eq 'Applied' -and $step.State -notin @('Applied','Unchanged')){throw 'Transação aplicada contém etapa não verificada.'}
+        if($Transaction.State -eq 'Prepared' -and $step.State -ne 'Prepared'){throw 'Transação preparada contém estado inconsistente.'}
+        if($Transaction.State -eq 'Restored' -and $step.State -notin @('Restored','Prepared','Unchanged')){throw 'Transação restaurada contém etapa pendente.'}
     }
 }
 function Undo-GoatTransactionInternal {
@@ -201,13 +296,17 @@ function Invoke-GoatActionBatch {
         $preview=@(Get-GoatActionPreview $Session $Ids $Direction)
         $transaction=[pscustomobject]@{SchemaVersion=1;Id=[guid]::NewGuid().ToString('N');Identity=$identity;CreatedUtc=[DateTime]::UtcNow.ToString('o');State='Prepared';Steps=@()}
         foreach ($item in $preview) {
-            $transaction.Steps+=[pscustomobject]@{Id=$item.Id;Target=$item.Action;Original=$item.Before;Proposed=$item.Proposed;State='Prepared';Error=$null}
+            $step=[pscustomobject]@{Id=$item.Id;Target=($item.Action|ConvertTo-Json -Depth 8|ConvertFrom-Json);Original=($item.Before|ConvertTo-Json -Depth 16|ConvertFrom-Json);Proposed=($item.Proposed|ConvertTo-Json -Depth 16|ConvertFrom-Json);State='Prepared';Error=$null;SnapshotSha256=$null}
+            Assert-GoatRegistrySnapshot $step.Original;Assert-GoatRegistrySnapshot $step.Proposed
+            $step.SnapshotSha256=Get-GoatSnapshotHash $step;$transaction.Steps+=$step
         }
         $path=Join-Path $Session.Root ('transactions\'+$transaction.Id+'.json')
         Write-GoatJson $transaction $path # durable exact snapshot before first write
+        $saved=Get-Content -LiteralPath $path -Raw -Encoding UTF8|ConvertFrom-Json;Assert-GoatTransaction $saved $identity
         try {
             $transaction.State='Applying'; Write-GoatJson $transaction $path
             foreach ($step in $transaction.Steps) {
+                if(Test-GoatStateEqual $step.Original $step.Proposed){$step.State='Unchanged';Write-GoatJson $transaction $path;continue}
                 $step.State='Applying'; Write-GoatJson $transaction $path
                 Write-GoatRegistry $step.Target $step.Proposed
                 if (-not (Test-GoatStateEqual (Read-GoatRegistry $step.Target) $step.Proposed)) { throw 'Verificação após aplicação falhou.' }
@@ -239,6 +338,13 @@ function Restore-GoatTransaction {
         if($transaction.State -eq 'Restored'){return $transaction}
         $later=@(Get-GoatRelatedTransactions $Session (Get-GoatIdentity) | Where-Object { $_.CreatedUtc -gt $transaction.CreatedUtc -and $_.State -ne 'Restored' })
         if($later.Count){throw 'Restaure primeiro a transação mais recente para preservar a ordem dos valores.'}
+        if($transaction.State -eq 'Applied'){
+            foreach($step in $transaction.Steps){
+                if($step.State -eq 'Unchanged'){continue}
+                $current=Read-GoatRegistry $step.Target
+                if(-not (Test-GoatStateEqual $current $step.Proposed) -and -not (Test-GoatStateEqual $current $step.Original)){throw 'Estado atual diverge do valor aplicado e do original; revisão manual necessária antes da restauração.'}
+            }
+        }
         Undo-GoatTransactionInternal $transaction $transaction.JournalPath
         Add-GoatEvent $Session 'Restored' ('Restaurada '+$TransactionId)
         return $transaction

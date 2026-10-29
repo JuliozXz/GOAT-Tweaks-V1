@@ -49,6 +49,15 @@ function ConvertTo-GoatInventoryNumber {
     if([double]::TryParse([string]$Value,[Globalization.NumberStyles]::Float,[Globalization.CultureInfo]::InvariantCulture,[ref]$parsed) -and -not [double]::IsNaN($parsed) -and -not [double]::IsInfinity($parsed)){return $parsed}
     return $null
 }
+function ConvertTo-GoatInventoryFlag {
+    param($Value)
+    if($null -eq $Value){return $null}
+    if($Value -is [bool]){return $Value}
+    $number=ConvertTo-GoatInventoryNumber $Value
+    if($number -eq 0 -and $null -ne $number){return $false}
+    if($number -eq 1){return $true}
+    return $null
+}
 function Get-GoatInventory {
     [CmdletBinding()]
     param([switch]$Demo,[switch]$IncludeGpu,[switch]$SkipGpuTelemetry,[ValidateRange(1,15)][int]$TimeoutSec=4,[scriptblock]$QueryProvider,[scriptblock]$RegistryProvider,[scriptblock]$ProcessProvider,[scriptblock]$AppProvider)
@@ -86,6 +95,9 @@ function Get-GoatInventory {
             $items=@(& $QueryProvider $ClassName $Namespace $Property $Filter $TimeoutSec | Where-Object {$null -ne $_})
             $status=if($items.Count){'READ_ONLY'}else{'EMPTY'}
             if(-not $items.Count){$issues.Add([pscustomobject]@{Source=($Namespace+'/'+$ClassName);Status='EMPTY';Reason='Provider retornou zero registros; dados permanecem indisponiveis.'})}
+            elseif(@($items | Where-Object {$names=@($_.PSObject.Properties.Name);@($Property | Where-Object {$_ -in $names}).Count -eq 0}).Count){
+                $status='PARTIAL';$issues.Add([pscustomobject]@{Source=($Namespace+'/'+$ClassName);Status='MISSING_FIELDS';Reason='Provider retornou objeto sem os campos solicitados; valores permanecem desconhecidos.'})
+            }
         } catch {
             $items=@();$status='UNAVAILABLE'
             $issues.Add([pscustomobject]@{Source=($Namespace+'/'+$ClassName);Status=$status;Reason=('Falha de consulta: '+$_.Exception.GetType().Name)})
@@ -120,12 +132,12 @@ function Get-GoatInventory {
     $freeBytes=if($null -ne $freeKb -and $freeKb -ge 0){$freeKb*1024}else{$null}
     $usedPercent=if($null -ne $totalBytes -and $totalBytes -gt 0 -and $null -ne $freeBytes -and $freeBytes -ge 0 -and $freeBytes -le $totalBytes){[Math]::Round(100*(1-$freeBytes/$totalBytes),2)}else{$null}
     $capacities=@($memoryRows | ForEach-Object {ConvertTo-GoatInventoryNumber $_.Capacity} | Where-Object {$null -ne $_ -and $_ -gt 0})
-    $installedBytes=if($capacities.Count){($capacities | Measure-Object -Sum).Sum}else{$null}
+    $installedBytes=if($capacities.Count -gt 0 -and $capacities.Count -eq $memoryRows.Count){($capacities | Measure-Object -Sum).Sum}else{$null}
     $models=@($cpuRows | ForEach-Object {$_.Name} | Where-Object {$_} | Sort-Object -Unique)
     $coreValues=@($cpuRows | ForEach-Object {ConvertTo-GoatInventoryNumber $_.NumberOfCores} | Where-Object {$null -ne $_ -and $_ -gt 0})
     $threadValues=@($cpuRows | ForEach-Object {ConvertTo-GoatInventoryNumber $_.NumberOfLogicalProcessors} | Where-Object {$null -ne $_ -and $_ -gt 0})
-    $coreCount=if($coreValues.Count){($coreValues | Measure-Object -Sum).Sum}else{$null}
-    $threadCount=if($threadValues.Count){($threadValues | Measure-Object -Sum).Sum}else{$null}
+    $coreCount=if($coreValues.Count -gt 0 -and $coreValues.Count -eq $cpuRows.Count){($coreValues | Measure-Object -Sum).Sum}else{$null}
+    $threadCount=if($threadValues.Count -gt 0 -and $threadValues.Count -eq $cpuRows.Count){($threadValues | Measure-Object -Sum).Sum}else{$null}
     $isRdp=($env:SESSIONNAME -match '^RDP-|^ICA-')
     $processKnown=$true
     try {$processNames=@(& $ProcessProvider)}catch{$processNames=@();$processKnown=$false;$issues.Add([pscustomobject]@{Source='Get-Process';Status='UNAVAILABLE';Reason='Nomes de processo indisponiveis; contexto remoto permanece incerto.'})}
@@ -137,20 +149,20 @@ function Get-GoatInventory {
     $cbs=Read-InventoryValue 'LocalMachine' 'SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending' '' $true
     $wu=Read-InventoryValue 'LocalMachine' 'SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired' '' $true
     $pendingRename=Read-InventoryValue 'LocalMachine' 'SYSTEM\CurrentControlSet\Control\Session Manager' 'PendingFileRenameOperations'
-    $rebootReasons=@();if($cbs -eq $true){$rebootReasons+='Component Based Servicing'};if($wu -eq $true){$rebootReasons+='Windows Update'};if($null -ne $pendingRename -and @($pendingRename).Count -gt 0){$rebootReasons+='Pending file operations'}
+    $rebootReasons=@();if($cbs -eq $true){$rebootReasons+='Component Based Servicing'};if($wu -eq $true){$rebootReasons+='Windows Update'};if(@($pendingRename | Where-Object {-not [string]::IsNullOrWhiteSpace([string]$_)}).Count -gt 0){$rebootReasons+='Pending file operations'}
     $rebootReadFailed=@($issues | Where-Object {$_.Status -eq 'UNAVAILABLE' -and $_.Source -match 'Component Based Servicing|WindowsUpdate.+RebootRequired|Session Manager/PendingFileRenameOperations'}).Count -gt 0
     $rebootPending=if($rebootReasons.Count){$true}elseif($null -ne $cbs -and $null -ne $wu -and -not $rebootReadFailed){$false}else{$null}
     $cpuTotal=@($cpuPerf | Where-Object Name -eq '_Total' | Select-Object -First 1)
     $cpuNumber=if($cpuTotal.Count){ConvertTo-GoatInventoryNumber $cpuTotal[0].PercentProcessorTime}else{$null}
     $cpuValue=if($null -ne $cpuNumber -and $cpuNumber -ge 0 -and $cpuNumber -le 100){$cpuNumber}else{$null}
     $gpuEngines=@(foreach($engine in $gpuPerf){$engineValue=ConvertTo-GoatInventoryNumber $engine.UtilizationPercentage;if($null -ne $engineValue -and $engineValue -ge 0 -and $engineValue -le 100){[pscustomobject]@{Instance=$engine.Name;Percent=$engineValue;Source='Win32_PerfFormattedData_GPUPerformanceCounters_GPUEngine';Confidence='Per-engine instance only; not GPU total'}}})
-    $reliability=@(foreach($row in $reliabilityRows){[pscustomobject]@{DeviceId=$row.DeviceId;TemperatureC=$row.Temperature;WearPercent=$row.Wear;ReadErrorsTotal=$row.ReadErrorsTotal;WriteErrorsTotal=$row.WriteErrorsTotal;PowerOnHours=$row.PowerOnHours;Source='MSFT_StorageReliabilityCounter';Confidence='Provider-reported; support varies'}})
+    $reliability=@(foreach($row in $reliabilityRows){[pscustomobject]@{DeviceId=$row.DeviceId;TemperatureC=(ConvertTo-GoatInventoryNumber $row.Temperature);WearPercent=(ConvertTo-GoatInventoryNumber $row.Wear);ReadErrorsTotal=(ConvertTo-GoatInventoryNumber $row.ReadErrorsTotal);WriteErrorsTotal=(ConvertTo-GoatInventoryNumber $row.WriteErrorsTotal);PowerOnHours=(ConvertTo-GoatInventoryNumber $row.PowerOnHours);Source='MSFT_StorageReliabilityCounter';Confidence='Provider-reported; support varies'}})
     $gpuCenter=$null
     if($IncludeGpu -and (Get-Command Get-GoatGpuCenter -ErrorAction SilentlyContinue)) {try{$gpuCenter=Get-GoatGpuCenter -IncludeTelemetry}catch{$issues.Add([pscustomobject]@{Source='Get-GoatGpuCenter';Status='UNAVAILABLE';Reason=$_.Exception.GetType().Name})}}
     [pscustomobject]@{
         SchemaVersion=1;Demo=$false;CollectedUtc=$now;ReadOnly=$true;Status=$(if($issues.Count){'PARTIAL'}else{'READ_ONLY'})
         OS=[pscustomobject]@{Name=$os.Caption;Version=$os.Version;Build=$os.BuildNumber;Edition=$os.OperatingSystemSKU;Architecture=$os.OSArchitecture;Source='Win32_OperatingSystem';Confidence=$(if($os){'Provider-reported'}else{'Unknown'})}
-        CPU=[pscustomobject]@{Name=($models -join '; ');Models=$models;Cores=$coreCount;LogicalProcessors=$threadCount;Source='Win32_Processor';Confidence=$(if($cpuRows.Count){'Provider-reported'}else{'Unknown'})}
+        CPU=[pscustomobject]@{Name=$(if($models.Count){$models -join '; '}else{$null});Models=$models;Cores=$coreCount;LogicalProcessors=$threadCount;Source='Win32_Processor';Confidence=$(if($models.Count -and $null -ne $coreCount -and $null -ne $threadCount){'Provider-reported'}else{'Unknown or incomplete'})}
         Memory=[pscustomobject]@{TotalBytes=$totalBytes;InstalledBytes=$installedBytes;FreeBytes=$freeBytes;UsedPercent=$usedPercent;Modules=@($memoryRows | ForEach-Object {[pscustomobject]@{CapacityBytes=$_.Capacity;SpeedMhz=$_.Speed;ConfiguredSpeedMhz=$_.ConfiguredClockSpeed}});Source='Win32_OperatingSystem + Win32_PhysicalMemory';Confidence=$(if($null -ne $usedPercent){'Read-only snapshot'}else{'Unknown'})}
         Disks=@($diskRows | ForEach-Object {$diskSize=ConvertTo-GoatInventoryNumber $_.Size;$diskFree=ConvertTo-GoatInventoryNumber $_.FreeSpace;[pscustomobject]@{Name=$_.DeviceID;FileSystem=$_.FileSystem;SizeBytes=$diskSize;FreeBytes=$diskFree;FreePercent=$(if($null -ne $diskSize -and $diskSize -gt 0 -and $null -ne $diskFree -and $diskFree -ge 0 -and $diskFree -le $diskSize){[Math]::Round(100*$diskFree/$diskSize,2)}else{$null});Source='Win32_LogicalDisk';Confidence='Provider-reported'}})
         PhysicalDisks=@($physicalRows | ForEach-Object {[pscustomobject]@{Model=$_.Model;MediaType=$_.MediaType;SizeBytes=$_.Size;InterfaceType=$_.InterfaceType;ProviderStatus=$_.Status;Source='Win32_DiskDrive';Note='ProviderStatus does not prove full SMART health.'}})
@@ -159,9 +171,9 @@ function Get-GoatInventory {
         Startup=@($startupRows | ForEach-Object {[pscustomobject]@{Name=$_.Name;Location=$_.Location;Source='Win32_StartupCommand';Note='Comando e usuario omitidos; impacto nao medido.'}})
         Apps=$apps
         RemoteContext=[pscustomobject]@{IsRemote=$remoteState;IsRdp=$isRdp;RemoteProcessNames=$remoteNames;Confidence=$(if($isRdp){'SESSIONNAME indicates RDP/ICA'}elseif($remoteNames.Count){'Remote software present; active connection unknown'}else{'Session environment and process names; physical presence not proven'});DriverMaintenanceBlocked=$true;Source='SESSIONNAME + Get-Process names';Note='Liberacao de manutencao de driver exige pessoa local e plano de recuperacao em fluxo separado.'}
-        Security=[pscustomobject]@{UacEnabled=$(if($null -ne $uac){[bool]$uac}else{$null});HvciConfigured=$(if($null -ne $hvci){[bool]$hvci}else{$null});VbsStatus=$(if($deviceGuardRows.Count){$deviceGuardRows[0].VirtualizationBasedSecurityStatus}else{$null});SecurityServicesRunning=$(if($deviceGuardRows.Count){@($deviceGuardRows[0].SecurityServicesRunning)}else{@()});DefenderEnabled=$(if($defenderRows.Count){$defenderRows[0].AntivirusEnabled}else{$null});DefenderRealTimeEnabled=$(if($defenderRows.Count){$defenderRows[0].RealTimeProtectionEnabled}else{$null});Source='Registry read + DeviceGuard/Defender CIM';Confidence='Reported state; no security setting changed'}
+        Security=[pscustomobject]@{UacEnabled=(ConvertTo-GoatInventoryFlag $uac);HvciConfigured=(ConvertTo-GoatInventoryFlag $hvci);VbsStatus=$(if($deviceGuardRows.Count){$deviceGuardRows[0].VirtualizationBasedSecurityStatus}else{$null});SecurityServicesRunning=$(if($deviceGuardRows.Count){@($deviceGuardRows[0].SecurityServicesRunning)}else{@()});DefenderEnabled=$(if($defenderRows.Count){ConvertTo-GoatInventoryFlag $defenderRows[0].AntivirusEnabled}else{$null});DefenderRealTimeEnabled=$(if($defenderRows.Count){ConvertTo-GoatInventoryFlag $defenderRows[0].RealTimeProtectionEnabled}else{$null});Source='Registry read + DeviceGuard/Defender CIM';Confidence='Reported state; no security setting changed'}
         Reboot=[pscustomobject]@{Pending=$rebootPending;Reasons=$rebootReasons;Source='CBS + Windows Update + Session Manager flags';Confidence='Known indicators only; not a complete reboot guarantee'}
-        Telemetry=[pscustomobject]@{SampleUtc=$now;CPU=[pscustomobject]@{TotalPercent=$cpuValue;Threads=@($cpuPerf | Where-Object Name -ne '_Total' | ForEach-Object {[pscustomobject]@{Name=$_.Name;Percent=$_.PercentProcessorTime}});Status=$(if($null -ne $cpuValue){'READ_ONLY'}else{'UNAVAILABLE'});Source='Win32_PerfFormattedData_PerfOS_Processor'};RAM=[pscustomobject]@{UsedPercent=$usedPercent;CommittedBytes=$(if($memoryPerf.Count){$memoryPerf[0].CommittedBytes}else{$null});CommitLimitBytes=$(if($memoryPerf.Count){$memoryPerf[0].CommitLimit}else{$null});Status=$(if($null -ne $usedPercent){'READ_ONLY'}else{'UNAVAILABLE'});Source='Win32_OperatingSystem + PerfOS_Memory'};GpuEngines=$gpuEngines;GpuTotalPercent=$null;Note='Snapshot; motores GPU nao sao somados. Sem temperatura/clocks/VRAM de fonte validada = indisponivel. Sem medicao de input lag/FPS.'}
+        Telemetry=[pscustomobject]@{SampleUtc=$now;CPU=[pscustomobject]@{TotalPercent=$cpuValue;Threads=@($cpuPerf | Where-Object Name -ne '_Total' | ForEach-Object {$percent=ConvertTo-GoatInventoryNumber $_.PercentProcessorTime;[pscustomobject]@{Name=$_.Name;Percent=$(if($null -ne $percent -and $percent -ge 0 -and $percent -le 100){$percent}else{$null})}});Status=$(if($null -ne $cpuValue){'READ_ONLY'}else{'UNAVAILABLE'});Source='Win32_PerfFormattedData_PerfOS_Processor'};RAM=[pscustomobject]@{UsedPercent=$usedPercent;CommittedBytes=$(if($memoryPerf.Count){ConvertTo-GoatInventoryNumber $memoryPerf[0].CommittedBytes}else{$null});CommitLimitBytes=$(if($memoryPerf.Count){ConvertTo-GoatInventoryNumber $memoryPerf[0].CommitLimit}else{$null});Status=$(if($null -ne $usedPercent){'READ_ONLY'}else{'UNAVAILABLE'});Source='Win32_OperatingSystem + PerfOS_Memory'};GpuEngines=$gpuEngines;GpuTotalPercent=$null;Note='Snapshot; motores GPU nao sao somados. Sem temperatura/clocks/VRAM de fonte validada = indisponivel. Sem medicao de input lag/FPS.'}
         GpuCenter=$gpuCenter;SourceIssues=@($issues.ToArray());Providers=@($providers.ToArray());Privacy='No client name, serial, MAC, IP, process command line, startup command or credentials collected.'
     }
 }
@@ -174,6 +186,10 @@ function Get-GoatCompleteInventory {
     try {
         if(-not (Get-Command Get-GoatGpuCenter -ErrorAction SilentlyContinue)){throw 'GpuModuleUnavailable'}
         $inventory.GpuCenter=Get-GoatGpuCenter -Demo:$Demo -IncludeTelemetry
+        if(-not $Demo -and $inventory.GpuCenter.Status -eq 'UNAVAILABLE'){
+            $inventory.Status='PARTIAL'
+            $inventory.SourceIssues+=[pscustomobject]@{Source='Get-GoatGpuCenter';Status='UNAVAILABLE';Reason='GPU provider returned no reliable inventory; dependent capabilities remain unknown.'}
+        }
         $inventory.Telemetry.GpuEngines=@($inventory.GpuCenter.Telemetry.EngineLoads | ForEach-Object {
             [pscustomobject]@{Instance=$_.Instance;Percent=$_.Value;Source=$_.Source;Confidence='Per-engine instance only; not GPU total'}
         })

@@ -96,6 +96,9 @@ try {
     $completeFailure=Get-GoatCompleteInventory
     Assert-Inventory ($completeFailure.GpuCenter.Status -eq 'UNAVAILABLE' -and @($completeFailure.GpuCenter.Devices).Count -eq 0) 'Complete inventory preserves a visible GPU object on provider failure.'
     Assert-Inventory ($completeFailure.GpuCenter.Capabilities.Hags -eq 'UNKNOWN' -and $completeFailure.RemoteContext.DriverMaintenanceBlocked) 'GPU failure keeps dependent capabilities unknown and driver maintenance blocked.'
+    function Get-GoatGpuCenter {param([switch]$Demo,[switch]$IncludeTelemetry) [pscustomobject]@{Status='UNAVAILABLE';Telemetry=[pscustomobject]@{EngineLoads=@()};RemoteContext=[pscustomobject]@{IsRemoteOrUncertain=$true}}}
+    $emptyGpu=Get-GoatCompleteInventory
+    Assert-Inventory ($emptyGpu.Status -eq 'PARTIAL' -and @($emptyGpu.SourceIssues|Where-Object Source -eq 'Get-GoatGpuCenter').Count -eq 1) 'GPU unavailable without an exception still makes the full inventory partial.'
 } finally {
     Set-Item function:Get-GoatInventory -Value $savedInventory
     if($savedGpu){Set-Item function:Get-GoatGpuCenter -Value $savedGpu}else{Remove-Item function:Get-GoatGpuCenter -ErrorAction SilentlyContinue}
@@ -103,4 +106,30 @@ try {
 $partialRebootRegistry={param($Hive,$Path,$Name,$KeyExists) if($Name -eq 'PendingFileRenameOperations'){throw 'read denied'};if($KeyExists){return $false};return $null}
 $partialReboot=Get-GoatInventory -QueryProvider { @() } -RegistryProvider $partialRebootRegistry -ProcessProvider {@()} -AppProvider {@()}
 Assert-Inventory ($null -eq $partialReboot.Reboot.Pending) 'A failed reboot flag read cannot become a confirmed no-reboot state.'
+$emptyRename={param($Hive,$Path,$Name,$KeyExists) if($KeyExists){return $false};if($Name -eq 'PendingFileRenameOperations'){return @('','  ')};return $null}
+$noRename=Get-GoatInventory -QueryProvider {@()} -RegistryProvider $emptyRename -ProcessProvider {@()} -AppProvider {@()}
+Assert-Inventory ($noRename.Reboot.Pending -eq $false -and @($noRename.Reboot.Reasons).Count -eq 0) 'Empty rename values do not create a false reboot flag.'
+$malformedProvider={
+    param($ClassName,$Namespace,$Property,$Filter,$TimeoutSec)
+    switch($ClassName){
+        'Win32_Processor' {@([pscustomobject]@{Name='CPU one';NumberOfCores=4;NumberOfLogicalProcessors=8},[pscustomobject]@{Name='CPU two';NumberOfCores=$null;NumberOfLogicalProcessors=8})}
+        'Win32_PhysicalMemory' {@([pscustomobject]@{Capacity=1024;Speed=3200},[pscustomobject]@{Capacity='N/A';Speed=$null})}
+        'Win32_OperatingSystem' {[pscustomobject]@{Caption='Test';TotalVisibleMemorySize=100;FreePhysicalMemory=200}}
+        'Win32_PerfFormattedData_PerfOS_Processor' {@([pscustomobject]@{Name='_Total';PercentProcessorTime='N/A'},[pscustomobject]@{Name='0';PercentProcessorTime=300})}
+        'Win32_PerfFormattedData_PerfOS_Memory' {[pscustomobject]@{CommittedBytes='N/A';CommitLimit='NaN'}}
+        'MSFT_StorageReliabilityCounter' {[pscustomobject]@{DeviceId='fixture';Temperature='N/A';Wear='N/A';ReadErrorsTotal=$null;WriteErrorsTotal=$null;PowerOnHours='NaN'}}
+        default {@()}
+    }
+}
+$invalidFlags={param($Hive,$Path,$Name,$KeyExists) if($KeyExists){return $false};if($Name -in @('EnableLUA','Enabled')){return 'unavailable'};return $null}
+$malformed=Get-GoatInventory -QueryProvider $malformedProvider -RegistryProvider $invalidFlags -ProcessProvider {@()} -AppProvider {@()}
+Assert-Inventory ($null -eq $malformed.CPU.Cores -and $malformed.CPU.LogicalProcessors -eq 16) 'Partial CPU socket core data is not presented as a complete machine total.'
+Assert-Inventory ($null -eq $malformed.Memory.InstalledBytes) 'Incomplete module capacities do not become an understated installed-memory total.'
+Assert-Inventory ($null -eq $malformed.Memory.UsedPercent) 'Inconsistent free/total memory cannot generate a negative utilization.'
+Assert-Inventory ($null -eq $malformed.Security.UacEnabled -and $null -eq $malformed.Security.HvciConfigured) 'Invalid security values never become enabled through a truthy string cast.'
+Assert-Inventory ($null -eq $malformed.Telemetry.CPU.TotalPercent -and $null -eq $malformed.Telemetry.CPU.Threads[0].Percent) 'Invalid CPU counters become unknown rather than fake numeric measurements.'
+Assert-Inventory ($null -eq $malformed.Telemetry.RAM.CommittedBytes -and $null -eq $malformed.Telemetry.RAM.CommitLimitBytes) 'Invalid commit values remain unknown.'
+Assert-Inventory ($null -eq $malformed.StorageReliability.Devices[0].TemperatureC -and $null -eq $malformed.StorageReliability.Devices[0].PowerOnHours) 'Invalid storage telemetry is not fabricated.'
+Assert-Inventory (@($strict.SourceIssues|Where-Object Status -eq 'MISSING_FIELDS').Count -eq 13 -and $strict.Status -eq 'PARTIAL') 'Objects missing every requested field are explicitly partial.'
+Assert-Inventory ((ConvertTo-GoatInventoryFlag 0) -eq $false -and (ConvertTo-GoatInventoryFlag 1) -eq $true -and $null -eq (ConvertTo-GoatInventoryFlag 2)) 'Security flags accept only defined binary values.'
 [pscustomobject]@{Suite='Inventory';Passed=$checks;Failed=0;DemoQueries=0;RealSystemQueries=0;Scope='Deterministic provider fixtures, not hardware compatibility certification'}

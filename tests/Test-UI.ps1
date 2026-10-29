@@ -1,6 +1,6 @@
 ﻿#Requires -Version 5.1
 [CmdletBinding()]
-param([string]$Bundle,[string]$ArtifactsRoot)
+param([string]$Bundle,[string]$ArtifactsRoot,[switch]$RealReadOnly)
 $ErrorActionPreference='Stop'
 if([Threading.Thread]::CurrentThread.ApartmentState -ne 'STA'){throw 'Run this WPF test with powershell.exe -STA.'}
 $projectRoot=Split-Path $PSScriptRoot -Parent
@@ -15,6 +15,7 @@ $script:UiStep=0
 $script:UiNavigationIndex=0
 $script:UiPages=@()
 $script:UiStarted=[DateTime]::UtcNow
+$script:UiCancelStarted=$false;$script:UiCancelCompleted=$false;$script:UiOriginalInventorySource=$null
 $script:UiFileQueue=New-Object 'System.Collections.Generic.Queue[string]'
 $script:UiArtifactRoot=$ArtifactsRoot
 $script:UiSourceMode=if($Bundle){'BUNDLED'}else{'SOURCE'}
@@ -62,6 +63,34 @@ try {
                 $a=$script:GoatApp;$c=$a.Controls
                 if($a.Worker){return}
                 if(-not $a.Session.Inventory){throw ('Inventory failed: '+$c.StatusText.Text)}
+                if($RealReadOnly){
+                    Assert-Ui (-not $a.Session.Demo -and -not $a.Session.Inventory.Demo -and $a.Session.Inventory.ReadOnly) 'physical inventory is real and explicitly read-only'
+                    Assert-Ui ($c.ModeLabel.Text -match '7.3.0' -and $c.ModeLabel.Text -notmatch 'PRÉVIA|preview') 'official version is shown in the real interface'
+                    $saved=Get-Content -LiteralPath (Join-Path $a.Session.Root 'session.json') -Raw -Encoding UTF8|ConvertFrom-Json
+                    Assert-Ui ($saved.Consent -eq $false -and $null -eq $saved.Inventory -and $null -ne $a.Session.Inventory) 'real inventory remains in memory until local recording consent'
+                    $script:UiPages=@($c.Navigation.ItemsSource)
+                    foreach($page in $script:UiPages){$c.Navigation.SelectedItem=$page;Assert-Ui ($a.Page -eq $page) ('real read-only navigation: '+$page)}
+                    $c.Navigation.SelectedItem='Windows / preferências';$c.ActionsList.SelectedIndex=0;Invoke-UiClick 'PreviewButton'
+                    Assert-Ui ($c.ActionDetail.Text -match 'HideFileExt' -and -not $c.ApplyButton.IsEnabled) 'native preview reads actual state while unvalidated writes stay unavailable'
+                    Assert-Ui (@(Get-GoatTransactions $a.Session).Count -eq 0) 'real UI scan creates no registry mutation journal'
+                    $c.Navigation.SelectedItem='Visão geral';Save-UiRender '08-real-readonly'
+                    $script:UiStep=10;$script:UiTimer.Stop();$a.Window.Close();return
+                }
+                if($script:UiStep -eq 0 -and -not $script:UiCancelCompleted){
+                    if(-not $script:UiCancelStarted){
+                        $script:UiOriginalInventorySource=$script:GoatSources.Inventory
+                        $script:GoatSources.Inventory+="`r`nfunction Get-GoatCompleteInventory { param([switch]`$Demo) Start-Sleep -Seconds 5; throw 'fixture should be cancelled' }"
+                        $script:UiPreviousInventory=$a.Session.Inventory
+                        Start-GoatInventoryWorker;Assert-Ui ($null -ne $a.Worker) 'cancel fixture runs in an owned background read worker'
+                        Invoke-UiClick 'CancelReadButton';Assert-Ui $a.Worker.CancelRequested 'cancel button requests asynchronous stop'
+                        $script:UiCancelStarted=$true;return
+                    }
+                    $script:GoatSources.Inventory=$script:UiOriginalInventorySource
+                    Assert-Ui ($c.StatusText.Text -match 'cancelada' -and [object]::ReferenceEquals($script:UiPreviousInventory,$a.Session.Inventory)) 'cancel preserves previous inventory and reports cancellation'
+                    Assert-Ui ($c.RefreshButton.IsEnabled -and $c.CancelReadButton.Visibility -eq 'Collapsed') 'cancelled worker releases controls for another scan'
+                    $script:UiCancelCompleted=$true
+                    Set-GoatStatus 'Demonstração: inventário de exemplo disponível. Nenhum ajuste foi aplicado.'
+                }
                 switch($script:UiStep){
                     0 {
                         Assert-Ui ($a.Session.Demo -and $a.Session.Inventory.Demo -and $a.Session.Inventory.ReadOnly) 'Demo inventory is explicitly simulated/read-only'
@@ -88,7 +117,7 @@ try {
                         $c.Navigation.SelectedItem='Catálogo completo'
                         Assert-Ui ($c.CatalogGrid.Items.Count -eq 344) 'catalog renders every documented ID'
                         $c.ClassBox.SelectedItem='X_BLOCKED'
-                        Assert-Ui ($c.CatalogGrid.Items.Count -eq 41) 'blocked class filter is accurate'
+                        Assert-Ui ($c.CatalogGrid.Items.Count -eq @($a.Catalog|Where-Object execution_class -eq 'X_BLOCKED').Count) 'blocked class filter includes original and current normative blocks'
                         $c.ClassBox.SelectedIndex=0;$c.CatalogSearch.Text='WIN-GAMEMODE'
                         Assert-Ui ($c.CatalogGrid.Items.Count -eq 1) 'catalog ID search works'
                         $c.CatalogGrid.SelectedIndex=0
@@ -139,9 +168,12 @@ try {
                     }
                     7 {
                         $c.Navigation.SelectedItem='Benchmarks';$c.ConditionsBox.Text=$script:UiConditionJson
-                        foreach($condition in @('Baseline','After')){
+                        if($a.Session.Benchmarks.Count -lt 6){
+                            $count=$a.Session.Benchmarks.Count;$condition=if($count -lt 3){'Baseline'}else{'After'};$pass=($count%3)+1
                             $c.ConditionLabelBox.SelectedItem=$condition
-                            foreach($pass in 1..3){$script:UiFileQueue.Enqueue((Join-Path $script:UiFixtureRoot ($condition+'-'+$pass+'.csv')));Invoke-UiClick 'ImportCaptureButton'}
+                            $script:UiFileQueue.Enqueue((Join-Path $script:UiFixtureRoot ($condition+'-'+$pass+'.csv')));Invoke-UiClick 'ImportCaptureButton'
+                            Assert-Ui ($null -ne $a.Worker -and $a.Worker.Kind -eq 'FrameCapture' -and -not $c.ImportCaptureButton.IsEnabled) 'frame import runs outside WPF thread and prevents overlapping imports'
+                            return
                         }
                         Assert-Ui ($a.Session.Benchmarks.Count -eq 6) 'six original benchmark captures imported through UI'
                         Invoke-UiClick 'CompareButton'
@@ -174,10 +206,10 @@ try {
         })
         $script:UiTimer.Start()
     }
-    Show-GoatApp -Demo -DataRoot (Join-Path $script:UiFixtureRoot 'sessions')
+    Show-GoatApp -Demo:(-not $RealReadOnly) -DataRoot (Join-Path $script:UiFixtureRoot 'sessions')
     if($script:UiFailure){throw $script:UiFailure}
     Assert-Ui ($script:UiStep -eq 10) 'UI workflow completed every stage'
-    [pscustomobject]@{Module='UI';Mode=$script:UiSourceMode;LaunchSha256=(Get-FileHash -LiteralPath $launchPath -Algorithm SHA256).Hash.ToLowerInvariant();Passed=$script:UiCheckNames.Count;NavigationPages=$script:UiPages.Count;Checks=$script:UiCheckNames.ToArray();Renders=$ArtifactsRoot;Scope='WPF Demo smoke workflow; no physical hardware or real preference mutation'}|ConvertTo-Json -Depth 5
+    [pscustomobject]@{Module='UI';Mode=$script:UiSourceMode;RealReadOnly=[bool]$RealReadOnly;LaunchSha256=(Get-FileHash -LiteralPath $launchPath -Algorithm SHA256).Hash.ToLowerInvariant();Passed=$script:UiCheckNames.Count;NavigationPages=$script:UiPages.Count;Checks=$script:UiCheckNames.ToArray();Renders=$ArtifactsRoot;Scope=$(if($RealReadOnly){'Physical read-only UI; no real preference mutation'}else{'WPF Demo workflow with isolated providers; no real preference mutation'})}|ConvertTo-Json -Depth 5
 }finally{
     if($script:UiTimer){$script:UiTimer.Stop()}
     $resolved=[IO.Path]::GetFullPath($script:UiFixtureRoot)

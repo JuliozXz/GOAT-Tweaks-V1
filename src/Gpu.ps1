@@ -179,13 +179,15 @@ function New-GoatGpuGameProfile {
         $canonical=$item.FullName
     }
     if ($Resolution -and $Resolution -notmatch '^\d{3,5}x\d{3,5}$') { throw 'Resolução deve ter formato 1920x1080.' }
-    [pscustomobject]@{Schema='GOAT_GPU_GAME_PROFILE';SchemaVersion=1;Id=[guid]::NewGuid().ToString();GameId=$GameId;GameName=$GameName;ExecutablePath=$canonical;PathAuthorized=[bool]$AuthorizedPath;Launcher=$Launcher;GpuPnpId=$GpuPnpId;Goal=$Goal;Resolution=$Resolution;RefreshRateHz=$(if($RefreshRateHz -gt 0){$RefreshRateHz}else{$null});Reflex=$Reflex;Vrr=$Vrr;VSync=$VSync;FpsCap=$(if($FpsCap -gt 0){$FpsCap}else{$null});CaptureRequired=[bool]$CaptureRequired;CapabilitySource='USER_CONFIRMED_OR_UNKNOWN';CreatedUtc=[DateTime]::UtcNow.ToString('o');Status='GUIDANCE_ONLY';WindowsSettingsChanged=$false;DriverSettingsChanged=$false}
+    $profile=[pscustomobject]@{Schema='GOAT_GPU_GAME_PROFILE';SchemaVersion=1;Id=[guid]::NewGuid().ToString();GameId=$GameId;GameName=$GameName;ExecutablePath=$canonical;PathAuthorized=[bool]$AuthorizedPath;Launcher=$Launcher;GpuPnpId=$GpuPnpId;Goal=$Goal;Resolution=$Resolution;RefreshRateHz=$(if($RefreshRateHz -gt 0){$RefreshRateHz}else{$null});Reflex=$Reflex;Vrr=$Vrr;VSync=$VSync;FpsCap=$(if($FpsCap -gt 0){$FpsCap}else{$null});CaptureRequired=[bool]$CaptureRequired;CapabilitySource='USER_CONFIRMED_OR_UNKNOWN';CreatedUtc=[DateTime]::UtcNow.ToString('o');Status='GUIDANCE_ONLY';WindowsSettingsChanged=$false;DriverSettingsChanged=$false}
+    Assert-GoatGpuGameProfile $profile
+    return $profile
 }
 
 function Get-GoatGpuProfileAdvice {
     [CmdletBinding()]
     param([Parameter(Mandatory=$true)]$Profile)
-    if ([string]$Profile.Schema -ne 'GOAT_GPU_GAME_PROFILE' -or [int]$Profile.SchemaVersion -ne 1) { throw 'Perfil GPU desconhecido.' }
+    Assert-GoatGpuGameProfile $Profile
     $advice=New-Object 'System.Collections.Generic.List[string]';$conflicts=New-Object 'System.Collections.Generic.List[string]'
     if (-not $Profile.GpuPnpId) { $conflicts.Add('GPU do jogo não confirmada; não selecionar uma GPU por inferência.') }
     if (-not $Profile.Resolution -or -not $Profile.RefreshRateHz) { $conflicts.Add('Resolução e/ou frequência do monitor não confirmadas.') }
@@ -204,6 +206,30 @@ function Get-GoatGpuProfileAdvice {
     [pscustomobject]@{Status='GUIDANCE_ONLY';CanApply=$false;ProfileId=$Profile.Id;Recommendations=@($advice.ToArray());Conflicts=@($conflicts.ToArray());MeasuredBenefit='NOT_MEASURED';Note='Prévia local de hipóteses; nenhuma preferência do Windows, jogo ou driver foi alterada.'}
 }
 
+function Assert-GoatGpuGameProfile {
+    param($Profile)
+    if($null -eq $Profile -or $Profile -is [array] -or $Profile.Schema -cne 'GOAT_GPU_GAME_PROFILE' -or $Profile.SchemaVersion -ne 1){throw 'Perfil GPU desconhecido.'}
+    $fields=@('Schema','SchemaVersion','Id','GameId','GameName','ExecutablePath','PathAuthorized','Launcher','GpuPnpId','Goal','Resolution','RefreshRateHz','Reflex','Vrr','VSync','FpsCap','CaptureRequired','CapabilitySource','CreatedUtc','Status','WindowsSettingsChanged','DriverSettingsChanged')
+    foreach($field in $fields){if($null -eq $Profile.PSObject.Properties[$field]){throw ('Campo ausente no perfil: '+$field)}}
+    foreach($property in $Profile.PSObject.Properties){if($property.Name -notin $fields){throw ('Campo não reconhecido no perfil: '+$property.Name)}}
+    if([string]$Profile.Id -notmatch '^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$'){throw 'Identificador do perfil inválido.'}
+    if($Profile.GameId -isnot [string] -or [string]::IsNullOrWhiteSpace($Profile.GameId) -or $Profile.GameId.Length -gt 200 -or $Profile.GameId -match '[\x00-\x1f]'){throw 'GameId inválido.'}
+    foreach($field in @('GameName','Launcher','GpuPnpId','Resolution','ExecutablePath')){if($null -ne $Profile.$field -and ($Profile.$field -isnot [string] -or $Profile.$field.Length -gt 2048 -or $Profile.$field -match '[\x00-\x1f]')){throw ('Texto inválido no perfil: '+$field)}}
+    foreach($field in @('PathAuthorized','CaptureRequired','WindowsSettingsChanged','DriverSettingsChanged')){if($Profile.$field -isnot [bool]){throw ('Flag inválida no perfil: '+$field)}}
+    if($Profile.Status -cne 'GUIDANCE_ONLY' -or $Profile.WindowsSettingsChanged -or $Profile.DriverSettingsChanged -or $Profile.CapabilitySource -cne 'USER_CONFIRMED_OR_UNKNOWN'){throw 'Perfil não é somente orientação.'}
+    if($Profile.Goal -notin @('Competitivo','Equilibrado','Qualidade / Captura') -or $Profile.Reflex -notin @('Unknown','Enabled','Disabled','Unsupported') -or $Profile.Vrr -notin @('Unknown','Enabled','Disabled','Unsupported') -or $Profile.VSync -notin @('Unknown','Enabled','Disabled')){throw 'Objetivo ou capacidade do perfil inválido.'}
+    foreach($field in @('RefreshRateHz','FpsCap')){
+        if($null -ne $Profile.$field){
+            if($Profile.$field -isnot [ValueType] -or $Profile.$field -is [bool]){throw ('Métrica do perfil inválida: '+$field)}
+            $value=[double]$Profile.$field;$maximum=if($field -eq 'RefreshRateHz'){1000}else{2000}
+            if([double]::IsNaN($value) -or [double]::IsInfinity($value) -or $value -le 0 -or $value -gt $maximum){throw ('Métrica fora da faixa: '+$field)}
+        }
+    }
+    if($Profile.Resolution){if($Profile.Resolution -notmatch '^(\d{3,5})x(\d{3,5})$' -or [int]$Matches[1] -lt 100 -or [int]$Matches[2] -lt 100 -or [int]$Matches[1] -gt 65535 -or [int]$Matches[2] -gt 65535){throw 'Resolução inválida.'}}
+    if($Profile.ExecutablePath -and (-not $Profile.PathAuthorized -or -not [IO.Path]::IsPathRooted($Profile.ExecutablePath) -or [IO.Path]::GetExtension($Profile.ExecutablePath) -ine '.exe')){throw 'Caminho de jogo inválido ou não autorizado.'}
+    $created=[datetime]::MinValue;if(-not [datetime]::TryParse([string]$Profile.CreatedUtc,[ref]$created)){throw 'Horário do perfil inválido.'}
+}
+
 function Save-GoatGpuGameProfile {
     [CmdletBinding()]
     param([Parameter(Mandatory=$true)]$Profile,[Parameter(Mandatory=$true)][string]$Path)
@@ -213,8 +239,12 @@ function Save-GoatGpuGameProfile {
     if (-not (Test-Path -LiteralPath $parent -PathType Container)) { throw 'A pasta de destino deve existir.' }
     if (Test-Path -LiteralPath $full) { throw 'O arquivo já existe. Escolha outro nome para preservar o original.' }
     $bytes=[Text.Encoding]::UTF8.GetBytes(($Profile | ConvertTo-Json -Depth 8))
-    $stream=New-Object IO.FileStream($full,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::None)
-    try {$stream.Write($bytes,0,$bytes.Length);$stream.Flush($true)}finally{$stream.Dispose()}
+    $temporary=Join-Path $parent ([guid]::NewGuid().ToString('N')+'.goat-profile.tmp')
+    try {
+        $stream=New-Object IO.FileStream($temporary,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::None)
+        try {$stream.Write($bytes,0,$bytes.Length);$stream.Flush($true)}finally{$stream.Dispose()}
+        [IO.File]::Move($temporary,$full)
+    }finally{if([IO.File]::Exists($temporary)){[IO.File]::Delete($temporary)}}
     [pscustomobject]@{Path=$full;Sha256=(Get-FileHash -LiteralPath $full -Algorithm SHA256).Hash.ToLowerInvariant();Status='SAVED_LOCAL_PROFILE';SystemSettingsChanged=$false}
 }
 
@@ -222,7 +252,7 @@ function Import-GoatGpuGameProfile {
     [CmdletBinding()]
     param([Parameter(Mandatory=$true)][string]$Path)
     $item=Get-Item -LiteralPath $Path -ErrorAction Stop
-    if ($item.PSIsContainer -or $item.Length -gt 65536 -or $item.Name -notlike '*.goat-profile.json') { throw 'Arquivo de perfil inválido ou maior que 64 KiB.' }
+    if ($item.PSIsContainer -or ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -or $item.Length -gt 65536 -or $item.Name -notlike '*.goat-profile.json') { throw 'Arquivo de perfil inválido ou maior que 64 KiB.' }
     $profile=Get-Content -LiteralPath $item.FullName -Raw -Encoding UTF8 | ConvertFrom-Json -ErrorAction Stop
     Get-GoatGpuProfileAdvice -Profile $profile | Out-Null
     if ($profile.WindowsSettingsChanged -ne $false -or $profile.DriverSettingsChanged -ne $false -or $profile.Status -ne 'GUIDANCE_ONLY') { throw 'Perfil não é somente orientação.' }

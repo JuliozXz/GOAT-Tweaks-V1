@@ -1,4 +1,5 @@
-﻿# Benchmark analysis is read-only. It never launches a game or installs a capture tool.
+﻿# Benchmark analysis never changes Windows settings or launches capture tools.
+# An explicit SnapshotPath preserves exactly the analyzed CSV bytes.
 # Windows PowerShell 5.1 compatible; metric calculations use actual supplied frames.
 
 function Get-GoatPercentile {
@@ -48,6 +49,53 @@ function Get-GoatFrameMetrics {
     }
 }
 
+function Read-GoatFrameSource {
+    param([Parameter(Mandatory)][string]$Path)
+    $file=Get-Item -LiteralPath $Path -ErrorAction Stop
+    if($file.PSIsContainer -or $file.Extension -ine '.csv'){throw 'Choose a CSV capture file.'}
+    # Readers are allowed, writers/deletes are not. A live capture must be closed
+    # first. Parsed text, hash and optional saved source derive from these bytes.
+    $stream=[IO.File]::Open($file.FullName,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::Read)
+    try {
+        if($stream.Length -gt 100MB){throw 'Capture exceeds the 100 MiB import limit. Export a bounded capture first.'}
+        $bytes=New-Object byte[] ([int]$stream.Length)
+        $offset=0
+        while($offset -lt $bytes.Length){
+            $read=$stream.Read($bytes,$offset,$bytes.Length-$offset)
+            if($read -le 0){throw 'Capture ended before its complete byte snapshot could be read.'}
+            $offset+=$read
+        }
+    } finally {$stream.Dispose()}
+    $algorithm=[Security.Cryptography.SHA256]::Create()
+    try{$hash=([BitConverter]::ToString($algorithm.ComputeHash($bytes))).Replace('-','').ToLowerInvariant()}finally{$algorithm.Dispose()}
+    $memory=[IO.MemoryStream]::new([byte[]]$bytes,$false)
+    $reader=[IO.StreamReader]::new($memory,[Text.UTF8Encoding]::new($false,$true),$true)
+    try{$text=$reader.ReadToEnd()}finally{$reader.Dispose();$memory.Dispose()}
+    [pscustomobject]@{Bytes=$bytes;Text=$text;Sha256=$hash;FileName=$file.Name}
+}
+
+function Write-GoatCaptureSnapshot {
+    param([Parameter(Mandatory)][byte[]]$Bytes,[Parameter(Mandatory)][string]$Path,[Parameter(Mandatory)][string]$ExpectedSha256)
+    $full=[IO.Path]::GetFullPath($Path)
+    if([IO.Path]::GetExtension($full) -ine '.csv'){throw 'Capture snapshot must use a .csv extension.'}
+    $parent=Split-Path $full -Parent
+    [void][IO.Directory]::CreateDirectory($parent)
+    if([IO.File]::Exists($full)){throw 'Capture snapshot destination already exists; it will not be overwritten.'}
+    $temporary=Join-Path $parent ('.goat-capture-'+[guid]::NewGuid().ToString('N')+'.partial')
+    # Explicit SnapshotPath saves a copy, never changes Windows settings. Existing
+    # files are never overwritten. Only a complete verified temporary is moved to
+    # the final CSV name. Failed partial files remain clearly marked for diagnosis.
+    $stream=[IO.File]::Open($temporary,[IO.FileMode]::CreateNew,[IO.FileAccess]::ReadWrite,[IO.FileShare]::None)
+    try {
+        $stream.Write($Bytes,0,$Bytes.Length);$stream.Flush($true);$stream.Position=0
+        $algorithm=[Security.Cryptography.SHA256]::Create()
+        try{$actual=([BitConverter]::ToString($algorithm.ComputeHash($stream))).Replace('-','').ToLowerInvariant()}finally{$algorithm.Dispose()}
+        if($actual -cne $ExpectedSha256 -or $stream.Length -ne $Bytes.Length){throw 'Saved capture snapshot failed byte/hash verification. Preserve the file for diagnosis.'}
+    } finally {$stream.Dispose()}
+    [IO.File]::Move($temporary,$full) # Same directory, no overwrite on a race.
+    [IO.Path]::GetFileName($full)
+}
+
 function Import-GoatFrameCapture {
     [CmdletBinding()]
     param(
@@ -58,13 +106,12 @@ function Import-GoatFrameCapture {
         [string]$FrameTimeColumn,
         [Nullable[int]]$ProcessId,
         [char]$Delimiter = ',',
-        [string]$CultureName = ''
+        [string]$CultureName = '',
+        [string]$SnapshotPath
     )
-    $file = Get-Item -LiteralPath $Path -ErrorAction Stop
-    if ($file.PSIsContainer -or $file.Extension -ine '.csv') { throw 'Choose a CSV capture file.' }
-    if ($file.Length -gt 100MB) { throw 'Capture exceeds the 100 MiB import limit. Export a bounded capture first.' }
+    $snapshot=Read-GoatFrameSource -Path $Path
     $culture = [Globalization.CultureInfo]::GetCultureInfo($CultureName)
-    $rows = @(Import-Csv -LiteralPath $file.FullName -Delimiter $Delimiter -ErrorAction Stop)
+    $rows = @(ConvertFrom-Csv -InputObject $snapshot.Text -Delimiter $Delimiter -ErrorAction Stop)
     if ($rows.Count -eq 0) { throw 'Capture CSV is empty.' }
     $headers = @($rows[0].PSObject.Properties.Name)
     if ([string]::IsNullOrWhiteSpace($FrameTimeColumn)) {
@@ -120,6 +167,11 @@ function Import-GoatFrameCapture {
         'cpuframetime' { 'CPU frame intervals; not GPU time, display latency or input latency.' }
         default { 'User-supplied millisecond frame intervals; verify the capture tool definition.' }
     }
+    $metrics=Get-GoatFrameMetrics -FrameTimesMs $intervals.ToArray()
+    $snapshotName=$null
+    if(-not [string]::IsNullOrWhiteSpace($SnapshotPath)){
+        $snapshotName=Write-GoatCaptureSnapshot -Bytes $snapshot.Bytes -Path $SnapshotPath -ExpectedSha256 $snapshot.Sha256
+    }
     return [pscustomobject][ordered]@{
         SchemaVersion = 1
         CaptureId = [guid]::NewGuid().ToString('N')
@@ -127,10 +179,12 @@ function Import-GoatFrameCapture {
         ConditionLabel = $ConditionLabel
         PassNumber = $PassNumber
         Conditions = [pscustomobject]$safeConditions
-        Metrics = Get-GoatFrameMetrics -FrameTimesMs $intervals.ToArray()
+        Metrics = $metrics
         Source = [pscustomobject]@{
-            FileName = $file.Name
-            Sha256 = (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            FileName = $snapshot.FileName
+            Sha256 = $snapshot.Sha256
+            SnapshotFileName = $snapshotName
+            SnapshotStatus = $(if($snapshotName){'SAVED_AND_HASH_VERIFIED'}else{'NOT_REQUESTED'})
             Column = $FrameTimeColumn
             Units = 'ms'
             Semantics = $semantics

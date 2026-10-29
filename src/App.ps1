@@ -34,12 +34,14 @@ function Open-GoatOfficialLink {
 function Update-GoatSessionView {
     $a=$script:GoatApp;$s=$a.Session;$c=$a.Controls
     $c.SessionLabel.Text=('Sessão {0} · {1} · {2} · {3}' -f $s.Id.Substring(0,8),$s.Objective,$s.Mode,$s.State)
-    $c.ModeLabel.Text=if($s.Demo){'7.3 · DEMO / DADOS DE EXEMPLO'}else{'7.3 · PRÉVIA DE ENGENHARIA'}
+    $c.ModeLabel.Text=if($s.Demo){$script:GoatVersion+' · DEMO / EXEMPLOS'}else{$script:GoatVersion+' · EDIÇÃO OFICIAL'}
     $c.SessionDetails.Text=('ID: {0}{1}Armazenamento privado: {2}{1}Criada: {3}{1}Estado: {4}' -f $s.Id,[Environment]::NewLine,$s.Root,$s.CreatedUtc,$s.State)
     $c.ObjectiveBox.SelectedItem=$s.Objective;$c.ServiceModeBox.SelectedItem=$s.Mode;$c.ConsentBox.IsChecked=$s.Consent
     $c.ApplyButton.IsEnabled=($s.Demo -and $s.State -eq 'Open' -and -not $a.Worker)
     $c.ApplyButton.Content=if($s.Demo){'Simular seleção (Demo)'}else{'Aplicação aguardando validação'}
     $c.FinishButton.IsEnabled=(-not $a.Worker)
+    $c.CancelReadButton.Visibility=if($a.Worker){'Visible'}else{'Collapsed'}
+    $c.ImportCaptureButton.IsEnabled=($s.State -eq 'Open' -and -not $a.Worker)
 }
 function Update-GoatCatalogView {
     $a=$script:GoatApp;$c=$a.Controls;$q=$c.CatalogSearch.Text.Trim();$category=[string]$c.CategoryBox.SelectedItem;$class=[string]$c.ClassBox.SelectedItem
@@ -65,11 +67,11 @@ function Update-GoatHistoryView {
 function Update-GoatInventoryView {
     $a=$script:GoatApp;$c=$a.Controls;$i=$a.Session.Inventory
     if(-not $i){return}
-    $c.CpuSummary.Text=[string]$i.CPU.Name
-    $c.GpuSummary.Text=(@($i.GpuCenter.Devices | ForEach-Object { $_.Name+' · '+$_.DriverVersion }) -join "`n")
+    $c.CpuSummary.Text=if([string]::IsNullOrWhiteSpace([string]$i.CPU.Name)){'Indisponível nesta leitura'}else{[string]$i.CPU.Name}
+    $c.GpuSummary.Text=(@($i.GpuCenter.Devices | ForEach-Object { $_.Name+' · '+$(if($_.DriverVersion){$_.DriverVersion}else{'driver indisponível'}) }) -join "`n")
     if(-not $c.GpuSummary.Text){$c.GpuSummary.Text='Indisponível'}
-    $c.MemorySummary.Text=if($null -ne $i.Memory.TotalBytes){'{0:N1} GB · {1} % em uso' -f ($i.Memory.TotalBytes/1GB),$i.Memory.UsedPercent}else{'Indisponível'}
-    $c.OsSummary.Text=('{0} · build {1}' -f $i.OS.Name,$i.OS.Build)
+    $c.MemorySummary.Text=if($null -ne $i.Memory.TotalBytes){('{0:N1} GB' -f ($i.Memory.TotalBytes/1GB))+' · '+$(if($null -ne $i.Memory.UsedPercent){[string]$i.Memory.UsedPercent+' % em uso'}else{'utilização indisponível'})}else{'Indisponível'}
+    $c.OsSummary.Text=if($i.OS.Name){[string]$i.OS.Name+' · build '+$(if($i.OS.Build){[string]$i.OS.Build}else{'indisponível'})}else{'Windows: leitura indisponível'}
     $c.GpuDetail.Text=Format-GoatGpuView $i.GpuCenter
     $c.OemLinkButton.IsEnabled=(-not [string]::IsNullOrWhiteSpace([string]$i.GpuCenter.System.OemDriverSource))
     $c.ProfileGpuBox.ItemsSource=[string[]](@('Não confirmada')+@($i.GpuCenter.Devices | ForEach-Object Name));$c.ProfileGpuBox.SelectedIndex=0
@@ -88,20 +90,47 @@ function Start-GoatInventoryWorker {
     if($a.Session.State -ne 'Open'){Set-GoatStatus 'Abra nova sessão para analisar novamente.';return}
     $source='param([bool]$demo)' + "`r`n" + $script:GoatSources.Gpu + "`r`n" + $script:GoatSources.Inventory + "`r`nGet-GoatCompleteInventory -Demo:`$demo"
     $ps=[PowerShell]::Create();[void]$ps.AddScript($source);[void]$ps.AddArgument([bool]$a.Session.Demo)
-    try{$a.Worker=@{PS=$ps;Handle=$ps.BeginInvoke();Started=[DateTime]::UtcNow};$a.Controls.RefreshButton.IsEnabled=$false;Update-GoatSessionView;Set-GoatStatus 'Consultando hardware em segundo plano…'}
+    try{$a.Worker=@{PS=$ps;Handle=$ps.BeginInvoke();Kind='Inventory';Started=[DateTime]::UtcNow;CancelRequested=$false;StopHandle=$null};$a.Controls.RefreshButton.IsEnabled=$false;Update-GoatSessionView;Set-GoatStatus 'Consultando hardware em segundo plano…'}
     catch{$ps.Dispose();throw}
+}
+function Start-GoatFrameImportWorker {
+    param([string]$Path,[hashtable]$Conditions,[string]$ConditionLabel,[int]$PassNumber)
+    Assert-GoatOpenSession
+    $a=$script:GoatApp;$folder=Join-Path $a.Session.Root 'captures';[void][IO.Directory]::CreateDirectory($folder)
+    $snapshot=Join-Path $folder ([guid]::NewGuid().ToString('N')+'.csv')
+    $source='param($capturePath,$captureConditions,$captureLabel,$capturePass,$snapshotPath)'+"`r`n"+$script:GoatSources.Benchmark+"`r`n"+'Import-GoatFrameCapture -Path $capturePath -Conditions $captureConditions -ConditionLabel $captureLabel -PassNumber $capturePass -SnapshotPath $snapshotPath'
+    $ps=[PowerShell]::Create();[void]$ps.AddScript($source)
+    foreach($argument in @($Path,$Conditions,$ConditionLabel,$PassNumber,$snapshot)){[void]$ps.AddArgument($argument)}
+    try{$a.Worker=@{PS=$ps;Handle=$ps.BeginInvoke();Kind='FrameCapture';Started=[DateTime]::UtcNow;CancelRequested=$false;StopHandle=$null};$a.Controls.RefreshButton.IsEnabled=$false;Update-GoatSessionView;Set-GoatStatus 'Importando e verificando captura em segundo plano…'}catch{$ps.Dispose();throw}
+}
+function Stop-GoatInventoryWorker {
+    $a=$script:GoatApp;$w=$a.Worker
+    if(-not $w -or $w.CancelRequested){return}
+    $w.CancelRequested=$true
+    $w.StopHandle=$w.PS.BeginStop($null,$null)
+    Set-GoatStatus 'Cancelando a leitura. Os dados já salvos serão preservados.'
 }
 function Complete-GoatInventoryWorker {
     $a=$script:GoatApp;$w=$a.Worker
     if(-not $w){return}
-    if(-not $w.Handle.IsCompleted){return}
+    if(-not $w.Handle.IsCompleted){
+        if(([DateTime]::UtcNow-$w.Started).TotalSeconds -gt 90 -and -not $w.CancelRequested){Stop-GoatInventoryWorker}
+        return
+    }
     try{
         $result=@($w.PS.EndInvoke($w.Handle))
+        if($w.CancelRequested){Set-GoatStatus 'Leitura cancelada; nenhum ajuste foi aplicado.';return}
         if($w.PS.HadErrors){throw ($w.PS.Streams.Error | Out-String)}
-        if($result.Count -ne 1){throw 'Inventário retornou resultado inesperado.'}
-        $a.Session.Inventory=$result[0];Save-GoatSession $a.Session;Update-GoatInventoryView
-        Set-GoatStatus 'Inventário concluído. Fontes sem leitura aparecem como indisponíveis; FPS e input lag não medidos.'
-    }catch{Set-GoatStatus $_.Exception.Message -ErrorState}
+        if($result.Count -ne 1){throw 'A tarefa retornou resultado inesperado.'}
+        if($w.Kind -eq 'FrameCapture'){
+            $a.Session.Benchmarks+=$result[0];$a.Session.Comparison=$null;Save-GoatSession $a.Session
+            $a.Controls.BenchmarkDetail.Text=Format-GoatBenchmarkView -Captures @($a.Session.Benchmarks)
+            Set-GoatStatus 'Captura importada com hash e dados originais preservados.'
+        }else{
+            $a.Session.Inventory=$result[0];Save-GoatSession $a.Session;Update-GoatInventoryView
+            Set-GoatStatus 'Inventário concluído. Fontes sem leitura aparecem como indisponíveis; FPS e input lag não medidos.'
+        }
+    }catch{if($w.CancelRequested){Set-GoatStatus 'Leitura cancelada; nenhum ajuste foi aplicado.'}else{Set-GoatStatus $_.Exception.Message -ErrorState}}
     finally{$w.PS.Dispose();$a.Worker=$null;$a.Controls.RefreshButton.IsEnabled=$true;Update-GoatSessionView;Set-GoatPage $a.Page}
 }
 function Set-GoatPage {
@@ -119,7 +148,7 @@ function Set-GoatPage {
         'Rede / latência' {$c.DetailIntro.Text='RTT, jitter e perda são métricas de rede; não são FPS nem input lag. Nenhum adaptador é reconfigurado.';$c.DetailText.Text=Format-GoatHardwareView -Title 'Adaptadores de rede' -Value $i.Network}
         'Armazenamento' {$c.DetailIntro.Text='Saúde reportada pelo provedor, espaço e discos. Ausência de SMART é desconhecido. Nenhum benchmark de escrita automático.';$c.DetailText.Text=Format-GoatHardwareView -Title 'Armazenamento' -Value ([pscustomobject]@{Disks=$i.Disks;PhysicalDisks=$i.PhysicalDisks;StorageReliability=$i.StorageReliability})}
         'Inicialização / apps' {$c.DetailIntro.Text='Inventário somente leitura. Nenhum programa é encerrado e nenhuma entrada Run/RunOnce é apagada.';$c.DetailText.Text=Format-GoatHardwareView -Title 'Inicialização e aplicativos' -Value ([pscustomobject]@{Startup=$i.Startup;Apps=$i.Apps})}
-        'Steam / Discord / OBS' {$c.DetailIntro.Text='Guias assistidos: confirme versão, preserve captura e compare uma variável. Configurações de apps não são alteradas nesta prévia.';$docs=@($a.Documents|Where-Object {$_.path -match '03_GUIAS_MANUAIS|04_STEAM_DISCORD'});$c.DetailText.Text=(@($i.Apps|ConvertTo-Json -Depth 5)+@($docs|ForEach-Object content)) -join "`r`n`r`n"}
+        'Steam / Discord / OBS' {$c.DetailIntro.Text='Guias assistidos: confirme versão, preserve captura e compare uma variável. Siga as etapas do aplicativo e registre o resultado.';$docs=@($a.Documents|Where-Object {$_.path -match '03_GUIAS_MANUAIS|04_STEAM_DISCORD'});$c.DetailText.Text=((Format-GoatHardwareView -Title 'Aplicativos detectados' -Value $i.Apps)+"`r`n`r`n"+(@($docs|ForEach-Object content) -join "`r`n`r`n"))}
         'Relatórios' {$c.DetailIntro.Text='Exportação HTML/JSON/CSV com dados pessoais minimizados e pacote privado de reversão. O botão Exportar permite escolher o destino.';$c.DetailText.Text=Get-GoatDisplayJson (Get-GoatPublicReport $a.Session)}
         'Laboratório / bloqueios' {$c.DetailIntro.Text='Laboratório fora do lote. Segurança, BIOS, OC, DDU automático, HPET/MSI/BCD e remoções disruptivas não possuem executores neste app.';$c.DetailText.Text=Get-GoatDisplayJson @($a.Catalog|Where-Object execution_class -in @('X_BLOCKED','D_LAB_ONLY')|Select-Object id,title,execution_class,risk,when_not_to_use)}
     }
@@ -144,18 +173,20 @@ function Show-GoatApp {
     param([switch]$Demo,[string]$DataRoot,[string]$SessionPath)
     Add-Type -AssemblyName PresentationFramework,PresentationCore,WindowsBase,System.Windows.Forms
     $window=[Windows.Markup.XamlReader]::Parse($script:GoatXaml)
-    $window.MaxHeight=[Windows.SystemParameters]::WorkArea.Height;$window.MaxWidth=[Windows.SystemParameters]::WorkArea.Width
+    $window.Title='GOAT Tweaks '+$script:GoatVersion+' · GPU Center'
+    $area=[Windows.SystemParameters]::WorkArea
+    if($area.Width -gt 0){$window.MinWidth=[Math]::Min($window.MinWidth,$area.Width);$window.Width=[Math]::Min($window.Width,$area.Width);$window.MaxWidth=$area.Width}
+    if($area.Height -gt 0){$window.MinHeight=[Math]::Min($window.MinHeight,$area.Height);$window.Height=[Math]::Min($window.Height,$area.Height);$window.MaxHeight=$area.Height}
     $controls=@{}
     foreach($match in [regex]::Matches($script:GoatXaml,'x:Name="([^"]+)"')){$controls[$match.Groups[1].Value]=$window.FindName($match.Groups[1].Value)}
     $session=$null
     if($SessionPath){
-        $session=Get-Content -LiteralPath $SessionPath -Raw -Encoding UTF8|ConvertFrom-Json
-        if($session.SchemaVersion -ne 1 -or $session.Id -notmatch '^[a-f0-9]{32}$'){throw 'Sessão inválida.'}
-        $session.Root=Split-Path ([IO.Path]::GetFullPath($SessionPath)) -Parent
-        if([bool]$session.Demo -ne [bool]$Demo){throw 'Use o mesmo modo Demo da sessão salva.'}
+        $session=Import-GoatSession -Path $SessionPath -Demo:$Demo
     }else{$session=New-GoatSession -Demo:$Demo -Root $DataRoot}
     $script:GoatApp=@{Window=$window;Controls=$controls;Session=$session;Worker=$null;Page='Visão geral';DataRoot=$DataRoot;Catalog=@(($script:GoatCatalogJson|ConvertFrom-Json).controls);Documents=@(($script:GoatDocumentsJson|ConvertFrom-Json).documents);Preview=@();LastExport=$null}
     $a=$script:GoatApp;$c=$controls
+    $accessible=@{Navigation='Seções do GOAT Tweaks';CatalogSearch='Buscar configurações no catálogo';CategoryBox='Categoria';ClassBox='Classe de execução';DocumentSearch='Buscar documentação';GameIdBox='Identificador do jogo';GameNameBox='Nome do jogo';GamePathBox='Caminho autorizado do executável';ProfileGoalBox='Objetivo do perfil';ProfileGpuBox='GPU confirmada para o jogo';ResolutionBox='Resolução confirmada';HzBox='Taxa de atualização em Hz';FpsBox='Limite FPS confirmado';ReflexBox='Estado de Reflex';VrrBox='Estado de VRR';VSyncBox='Estado de V-Sync';ConditionsBox='Condições das capturas, em JSON';ConditionLabelBox='Condição antes ou depois';ObjectiveBox='Objetivo do atendimento';ServiceModeBox='Atendimento local ou remoto';GpuVendorBox='Fabricante da GPU';TransactionBox='Transação para restaurar';DirectionBox='Direção da preferência'}
+    foreach($name in $accessible.Keys){[Windows.Automation.AutomationProperties]::SetName($c[$name],$accessible[$name])}
     $pages=@('Visão geral','Atendimento','Catálogo completo','Windows / preferências','CPU / RAM','GPU CENTER','Jogos / perfis','Steam / Discord / OBS','Rede / latência','Armazenamento','Inicialização / apps','Benchmarks','Histórico / reversão','Relatórios','Documentação','Laboratório / bloqueios')
     $c.Navigation.ItemsSource=[string[]]$pages
     $c.ObjectiveBox.ItemsSource=[string[]]@('Equilibrado','Competitivo','Qualidade');$c.ServiceModeBox.ItemsSource=[string[]]@('Local','Remoto')
@@ -169,6 +200,7 @@ function Show-GoatApp {
     $c.ConditionsBox.Text='{"Game":"","GameBuild":"","Scene":"","Resolution":"","Preset":"","Api":"","Driver":"","OsBuild":"","FrameCap":"","VSync":"","CaptureTool":"","CaptureVersion":""}'
     $c.Navigation.Add_SelectionChanged({Invoke-GoatUiCommand {Set-GoatPage ([string]$script:GoatApp.Controls.Navigation.SelectedItem)}})
     $c.RefreshButton.Add_Click({Invoke-GoatUiCommand {Start-GoatInventoryWorker}})
+    $c.CancelReadButton.Add_Click({Invoke-GoatUiCommand {Stop-GoatInventoryWorker}})
     $c.SaveSessionButton.Add_Click({Invoke-GoatUiCommand {
         Assert-GoatOpenSession;$a=$script:GoatApp;$a.Session.Objective=[string]$a.Controls.ObjectiveBox.SelectedItem;$a.Session.Mode=[string]$a.Controls.ServiceModeBox.SelectedItem;$a.Session.Consent=[bool]$a.Controls.ConsentBox.IsChecked;Save-GoatSession $a.Session;Update-GoatSessionView;Update-GoatInventoryView;Set-GoatStatus 'Contexto salvo; revise o plano antes de qualquer ação.'
     }})
@@ -179,15 +211,13 @@ function Show-GoatApp {
     $c.ResumeButton.Add_Click({Invoke-GoatUiCommand {
         if($script:GoatApp.Worker){throw 'Aguarde o inventário.'}
         $path=Select-GoatFile 'Sessão GOAT|session.json';if(-not $path){return}
-        $s=Get-Content -LiteralPath $path -Raw -Encoding UTF8|ConvertFrom-Json
-        if($s.SchemaVersion -ne 1 -or $s.Id -notmatch '^[a-f0-9]{32}$'){throw 'Sessão inválida.'}
-        if([bool]$s.Demo -ne [bool]$script:GoatApp.Session.Demo){throw 'Abra o aplicativo no mesmo modo Demo da sessão.'}
-        $s.Root=Split-Path $path -Parent;$script:GoatApp.Session=$s;Update-GoatSessionView;Update-GoatInventoryView;Set-GoatPage 'Histórico / reversão';Set-GoatStatus 'Sessão recuperada; confira transações pendentes.'
+        $s=Import-GoatSession -Path $path -Demo:$script:GoatApp.Session.Demo
+        $script:GoatApp.Session=$s;Update-GoatSessionView;Update-GoatInventoryView;Set-GoatPage 'Histórico / reversão';Set-GoatStatus 'Sessão recuperada; confira transações pendentes.'
     }})
     $c.CatalogSearch.Add_TextChanged({Update-GoatCatalogView});$c.CategoryBox.Add_SelectionChanged({Update-GoatCatalogView});$c.ClassBox.Add_SelectionChanged({Update-GoatCatalogView})
     $c.CatalogGrid.Add_SelectionChanged({$item=$script:GoatApp.Controls.CatalogGrid.SelectedItem;if($item){$script:GoatApp.Controls.CatalogDetail.Text=Format-GoatCatalogView $item}})
     $c.DocumentSearch.Add_TextChanged({Update-GoatDocumentsView})
-    $c.DocumentsList.Add_SelectionChanged({$doc=$script:GoatApp.Controls.DocumentsList.SelectedItem;if($doc){$script:GoatApp.Controls.DocumentText.Text=('Fonte: '+$doc.path+"`r`nSHA256: "+$doc.sha256+"`r`nTipo: "+$doc.kind+"`r`n`r`n"+$doc.content)}})
+    $c.DocumentsList.Add_SelectionChanged({$doc=$script:GoatApp.Controls.DocumentsList.SelectedItem;if($doc){$script:GoatApp.Controls.DocumentText.Text=('Fonte: '+$doc.path+"`r`nSHA256: "+$doc.sha256+"`r`nTipo: "+$doc.kind+"`r`nReferência documental: decisões normativas vigentes e bloqueios do catálogo prevalecem sobre exemplos históricos. O conteúdo abaixo não é executado.`r`n`r`n"+$doc.content)}})
     $c.DriverLinkButton.Add_Click({Invoke-GoatUiCommand {Open-GoatOfficialLink (Get-GoatGpuOfficialDriverSource ([string]$script:GoatApp.Controls.GpuVendorBox.SelectedItem))}})
     $c.OemLinkButton.Add_Click({Invoke-GoatUiCommand {Open-GoatOfficialLink ([string]$script:GoatApp.Session.Inventory.GpuCenter.System.OemDriverSource)}})
     $c.GpuGuideButton.Add_Click({Invoke-GoatUiCommand {
@@ -213,10 +243,7 @@ function Show-GoatApp {
         Assert-GoatOpenSession;$a=$script:GoatApp;$conditionsObject=$a.Controls.ConditionsBox.Text|ConvertFrom-Json -ErrorAction Stop;$conditions=@{};foreach($property in $conditionsObject.PSObject.Properties){$conditions[$property.Name]=$property.Value}
         $path=Select-GoatFile 'Frametimes CSV|*.csv';if(-not $path){return}
         $label=[string]$a.Controls.ConditionLabelBox.SelectedItem;$pass=@($a.Session.Benchmarks|Where-Object ConditionLabel -eq $label).Count+1
-        $capture=Import-GoatFrameCapture -Path $path -Conditions $conditions -ConditionLabel $label -PassNumber $pass
-        $folder=Join-Path $a.Session.Root 'captures';[void][IO.Directory]::CreateDirectory($folder);Copy-Item -LiteralPath $path -Destination (Join-Path $folder ($capture.CaptureId+'.csv'))
-        $a.Session.Benchmarks+=$capture;$a.Session.Comparison=$null;Save-GoatSession $a.Session
-        $a.Controls.BenchmarkDetail.Text=Format-GoatBenchmarkView -Captures @($a.Session.Benchmarks);Set-GoatStatus 'Captura importada com hash e dados originais preservados.'
+        Start-GoatFrameImportWorker -Path $path -Conditions $conditions -ConditionLabel $label -PassNumber $pass
     }})
     $c.CompareButton.Add_Click({Invoke-GoatUiCommand {
         Assert-GoatOpenSession;$a=$script:GoatApp;$comparison=Compare-GoatBenchmarkRuns -BaselineRuns @($a.Session.Benchmarks|Where-Object ConditionLabel -eq 'Baseline') -AfterRuns @($a.Session.Benchmarks|Where-Object ConditionLabel -eq 'After') -StabilityVerified:([bool]$a.Controls.StabilityCheck.IsChecked);$a.Session.Comparison=$comparison;Save-GoatSession $a.Session;$a.Controls.BenchmarkDetail.Text=Format-GoatBenchmarkView -Captures @($a.Session.Benchmarks) -Comparison $comparison;Set-GoatStatus ('Comparação: '+$comparison.Status)

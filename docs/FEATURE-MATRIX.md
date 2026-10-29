@@ -1,6 +1,6 @@
 # Matriz funcional desta entrega
 
-Este app foi escrito do zero em PowerShell/WPF. A entrega e uma previa de engenharia: uma unica aplicacao integra inventario, GPU Center, catalogo, referencias, sessoes, analise de capturas e exportacao. A navegacao possui 16 paginas; isso nao significa 16 motores de otimizacao automaticos. Parte das paginas exibe dados estruturados e orientacoes.
+Este app foi escrito do zero em PowerShell/WPF. A versao oficial 7.3.0 cobre os fluxos implementados: uma unica aplicacao integra inventario, GPU Center, catalogo, referencias, sessoes, analise de capturas e exportacao. A navegacao possui 16 paginas; isso nao significa 16 motores de otimizacao automaticos. Parte das paginas exibe dados estruturados e orientacoes.
 
 ## As 16 paginas
 
@@ -25,13 +25,13 @@ Este app foi escrito do zero em PowerShell/WPF. A entrega e uma previa de engenh
 
 ## Finalizar servico e recuperacao
 
-O fluxo de finalizacao congela novas operacoes da sessao, verifica transacoes pendentes e exporta relatorio/pacote de reversao com manifesto validado. A finalizacao e idempotente e preserva a recuperacao se a exportacao falhar. Nesta previa o app e portatil; nao ha servico GOAT, agente persistente, desinstalador de terceiros nem limpeza universal do computador. Nenhum reinicio automatico ou apagamento de logs Windows/seguranca/cliente faz parte do fluxo.
+O fluxo de finalizacao congela novas operacoes da sessao, verifica transacoes pendentes e exporta relatorio/pacote de reversao com manifesto validado. A finalizacao e idempotente e preserva a recuperacao se a exportacao falhar. Nesta versao o app e portatil; nao ha servico GOAT, agente persistente, desinstalador de terceiros nem limpeza universal do computador. Nenhum reinicio automatico ou apagamento de logs Windows/seguranca/cliente faz parte do fluxo.
 
 ## Cobertura da especificacao
 
 - **344 IDs de especificacao**, com seus textos integrais, classe, fontes e estado original preservados: 246 do catalogo central + **73** complementos V7.3 + 25 do GPU Center. O texto de abertura dos complementos diz 66, mas seu array possui 73.
 - Os 66 registros de `new_controls` ja estao nos 246 centrais e nao sao somados novamente. IDs diferentes com comportamentos relacionados conservam `related_ids`; a contagem nao equivale a 344 acoes independentes.
-- **41 registros bloqueados** por classe ou modo explicito permanecem `X_BLOCKED`. Os demais tambem nao ganham permissao de execucao pela importacao.
+- **41 bloqueios originais** sao preservados, mais nove overrides normativos: **50 bloqueios efetivos**, com motivo/fonte/hash e texto original preservado. Os demais tambem nao ganham permissao de execucao pela importacao.
 - **64 documentos completos** incorporados para consulta. Isso nao transforma exemplos historicos ou pseudocodigo em implementacao.
 - **Duas preferencias nativas** possuem executores originais com preview, journal, read-back e rollback, ainda bloqueados para uso real ate concluir a matriz de validacao. Modo Demo simula sem alterar o Windows.
 

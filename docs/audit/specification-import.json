@@ -1,6 +1,6 @@
 {
     "schema_version":  "1.0.0",
-    "generated_utc":  "2026-10-28T23:15:21.6717440Z",
+    "generated_utc":  "2026-10-29T00:24:39.3362121Z",
     "read_method":  "Every source file read completely; every JSON scalar traversed and every CSV cell parsed. No source command executed.",
     "source_manifest_sha256":  "17809d900e5e6f8e099b53696c938bb85baacde67b6372c66d7facad1c24369c",
     "source_files_read":  83,
@@ -30,11 +30,11 @@
     "execution_classes":  [
                               {
                                   "class":  "C_MANUAL",
-                                  "count":  223
+                                  "count":  216
                               },
                               {
                                   "class":  "X_BLOCKED",
-                                  "count":  41
+                                  "count":  50
                               },
                               {
                                   "class":  "A_AUTO_SAFE",
@@ -46,7 +46,7 @@
                               },
                               {
                                   "class":  "D_LAB_ONLY",
-                                  "count":  12
+                                  "count":  10
                               }
                           ],
     "explicitly_blocked":  [
@@ -92,6 +92,229 @@
                                "SEC-002",
                                "SEC-003"
                            ],
+    "original_explicitly_blocked":  [
+                                        "WIN-EXPERIMENTAL",
+                                        "WIN-HUNG",
+                                        "CPU-SMT",
+                                        "CPU-CSTATES",
+                                        "PWR-MODERN",
+                                        "PWR-SLEEPSTUDY",
+                                        "MEM-COMPRESSION",
+                                        "MEM-STANDBY",
+                                        "MEM-RAM-ERROR",
+                                        "MEM-SVCHOST",
+                                        "STOR-NVME-DRIVER",
+                                        "STOR-IOLATENCY",
+                                        "GPU-NV-HDCP",
+                                        "GPU-NV-DMA",
+                                        "GPU-NV-THERMAL",
+                                        "GPU-AMD-POWERGATE",
+                                        "GPU-AMD-SPREAD",
+                                        "GPU-INTEL-ENERGY",
+                                        "GPU-DMA",
+                                        "NET-NAGLE",
+                                        "NET-NODELAY",
+                                        "NET-IPV6",
+                                        "NET-NEIGHBOR",
+                                        "NET-QOS-RESERVED",
+                                        "TIMER-BCDEDIT",
+                                        "TIMER-HPET",
+                                        "SEC-DEFENDER",
+                                        "SEC-FIREWALL",
+                                        "SEC-DMA",
+                                        "SEC-BOOT",
+                                        "TOOL-ISLC",
+                                        "WIN-POWERTHROTTLE",
+                                        "WIN-MMCSS",
+                                        "WIN-DATA-HOSTS",
+                                        "WIN-INVENTORY",
+                                        "GPU-VSYNCIDLE",
+                                        "GPU-INTEL-ENERGY-BLOCK",
+                                        "DISK-004",
+                                        "SEC-001",
+                                        "SEC-002",
+                                        "SEC-003"
+                                    ],
+    "effective_blocked":  [
+                              "WIN-EXPERIMENTAL",
+                              "WIN-HUNG",
+                              "CPU-SMT",
+                              "CPU-CSTATES",
+                              "CPU-PBO-OC",
+                              "PWR-MODERN",
+                              "PWR-SLEEPSTUDY",
+                              "MEM-COMPRESSION",
+                              "MEM-STANDBY",
+                              "MEM-RAM-ERROR",
+                              "MEM-SVCHOST",
+                              "STOR-SSD-FIRMWARE",
+                              "STOR-NVME-DRIVER",
+                              "STOR-IOLATENCY",
+                              "GPU-NV-HDCP",
+                              "GPU-NV-DMA",
+                              "GPU-NV-THERMAL",
+                              "GPU-NV-PERFLIMIT",
+                              "GPU-AMD-POWERGATE",
+                              "GPU-AMD-SPREAD",
+                              "GPU-INTEL-ENERGY",
+                              "GPU-OC-UV",
+                              "GPU-DMA",
+                              "NET-NAGLE",
+                              "NET-NODELAY",
+                              "NET-IPV6",
+                              "NET-NEIGHBOR",
+                              "NET-QOS-RESERVED",
+                              "TIMER-BCDEDIT",
+                              "TIMER-HPET",
+                              "INPUT-FIRMWARE",
+                              "MSI-MODE",
+                              "SEC-HVCI",
+                              "SEC-DEFENDER",
+                              "SEC-FIREWALL",
+                              "SEC-DMA",
+                              "SEC-BOOT",
+                              "TOOL-ISLC",
+                              "WIN-POWERTHROTTLE",
+                              "WIN-MMCSS",
+                              "WIN-DATA-HOSTS",
+                              "WIN-INVENTORY",
+                              "GPU-VSYNCIDLE",
+                              "GPU-INTEL-ENERGY-BLOCK",
+                              "GPU-003",
+                              "GPU-004",
+                              "DISK-004",
+                              "SEC-001",
+                              "SEC-002",
+                              "SEC-003"
+                          ],
+    "normative_overrides":  [
+                                {
+                                    "id":  "CPU-PBO-OC",
+                                    "source_execution_class":  "C_MANUAL",
+                                    "execution_class":  "X_BLOCKED",
+                                    "normative_reason":  "OC/undervolt de CPU e alteracao de tensao estao fora dos executores permitidos.",
+                                    "normative_source":  [
+                                                             "10_MODO_AVANCADO_SEGURO/01_MATRIZ_POLITICAS_AVANCADAS_SEGURAS.json",
+                                                             "04_PROMPT_PARA_IA/PROMPT_ATIVO_GOAT_TWEAKS.txt"
+                                                         ],
+                                    "normative_source_sha256":  [
+                                                                    "00866211cadf8a24270c81af39b1f78c4b7b53fca9ccc37d2f1b7e2e9917d5df",
+                                                                    "7b3d1230a174bb4bcc307a39ca570537582377af49e55a1ba1e5c4f58f739d52"
+                                                                ]
+                                },
+                                {
+                                    "id":  "STOR-SSD-FIRMWARE",
+                                    "source_execution_class":  "C_MANUAL",
+                                    "execution_class":  "X_BLOCKED",
+                                    "normative_reason":  "Escrita/flash de firmware nao possui executor permitido nem reversao honesta neste app.",
+                                    "normative_source":  [
+                                                             "10_MODO_AVANCADO_SEGURO/01_MATRIZ_POLITICAS_AVANCADAS_SEGURAS.json",
+                                                             "04_PROMPT_PARA_IA/PROMPT_ATIVO_GOAT_TWEAKS.txt"
+                                                         ],
+                                    "normative_source_sha256":  [
+                                                                    "00866211cadf8a24270c81af39b1f78c4b7b53fca9ccc37d2f1b7e2e9917d5df",
+                                                                    "7b3d1230a174bb4bcc307a39ca570537582377af49e55a1ba1e5c4f58f739d52"
+                                                                ]
+                                },
+                                {
+                                    "id":  "GPU-NV-PERFLIMIT",
+                                    "source_execution_class":  "C_MANUAL",
+                                    "execution_class":  "X_BLOCKED",
+                                    "normative_reason":  "O registro mistura diagnostico PerfCap com alteracao de power limit/OC; escrita do slider fica bloqueada, e o texto original de diagnostico permanece preservado.",
+                                    "normative_source":  [
+                                                             "10_MODO_AVANCADO_SEGURO/01_MATRIZ_POLITICAS_AVANCADAS_SEGURAS.json",
+                                                             "04_PROMPT_PARA_IA/PROMPT_ATIVO_GOAT_TWEAKS.txt"
+                                                         ],
+                                    "normative_source_sha256":  [
+                                                                    "00866211cadf8a24270c81af39b1f78c4b7b53fca9ccc37d2f1b7e2e9917d5df",
+                                                                    "7b3d1230a174bb4bcc307a39ca570537582377af49e55a1ba1e5c4f58f739d52"
+                                                                ]
+                                },
+                                {
+                                    "id":  "GPU-OC-UV",
+                                    "source_execution_class":  "C_MANUAL",
+                                    "execution_class":  "X_BLOCKED",
+                                    "normative_reason":  "OC/undervolt de GPU estao proibidos pelo contrato atual do GPU Center.",
+                                    "normative_source":  [
+                                                             "10_MODO_AVANCADO_SEGURO/01_MATRIZ_POLITICAS_AVANCADAS_SEGURAS.json",
+                                                             "04_PROMPT_PARA_IA/PROMPT_ATIVO_GOAT_TWEAKS.txt"
+                                                         ],
+                                    "normative_source_sha256":  [
+                                                                    "00866211cadf8a24270c81af39b1f78c4b7b53fca9ccc37d2f1b7e2e9917d5df",
+                                                                    "7b3d1230a174bb4bcc307a39ca570537582377af49e55a1ba1e5c4f58f739d52"
+                                                                ]
+                                },
+                                {
+                                    "id":  "INPUT-FIRMWARE",
+                                    "source_execution_class":  "C_MANUAL",
+                                    "execution_class":  "X_BLOCKED",
+                                    "normative_reason":  "Escrita/flash de firmware nao possui executor permitido neste app.",
+                                    "normative_source":  [
+                                                             "10_MODO_AVANCADO_SEGURO/01_MATRIZ_POLITICAS_AVANCADAS_SEGURAS.json",
+                                                             "04_PROMPT_PARA_IA/PROMPT_ATIVO_GOAT_TWEAKS.txt"
+                                                         ],
+                                    "normative_source_sha256":  [
+                                                                    "00866211cadf8a24270c81af39b1f78c4b7b53fca9ccc37d2f1b7e2e9917d5df",
+                                                                    "7b3d1230a174bb4bcc307a39ca570537582377af49e55a1ba1e5c4f58f739d52"
+                                                                ]
+                                },
+                                {
+                                    "id":  "MSI-MODE",
+                                    "source_execution_class":  "C_MANUAL",
+                                    "execution_class":  "X_BLOCKED",
+                                    "normative_reason":  "Alteracoes MSI/IRQ estao bloqueadas pelo contrato atual; inventario nao autoriza escrita.",
+                                    "normative_source":  [
+                                                             "10_MODO_AVANCADO_SEGURO/01_MATRIZ_POLITICAS_AVANCADAS_SEGURAS.json",
+                                                             "04_PROMPT_PARA_IA/PROMPT_ATIVO_GOAT_TWEAKS.txt"
+                                                         ],
+                                    "normative_source_sha256":  [
+                                                                    "00866211cadf8a24270c81af39b1f78c4b7b53fca9ccc37d2f1b7e2e9917d5df",
+                                                                    "7b3d1230a174bb4bcc307a39ca570537582377af49e55a1ba1e5c4f58f739d52"
+                                                                ]
+                                },
+                                {
+                                    "id":  "SEC-HVCI",
+                                    "source_execution_class":  "C_MANUAL",
+                                    "execution_class":  "X_BLOCKED",
+                                    "normative_reason":  "Desativar VBS/HVCI e protecoes foi revogado; somente diagnostico permanece permitido.",
+                                    "normative_source":  [
+                                                             "10_MODO_AVANCADO_SEGURO/01_MATRIZ_POLITICAS_AVANCADAS_SEGURAS.json",
+                                                             "04_PROMPT_PARA_IA/PROMPT_ATIVO_GOAT_TWEAKS.txt"
+                                                         ],
+                                    "normative_source_sha256":  [
+                                                                    "00866211cadf8a24270c81af39b1f78c4b7b53fca9ccc37d2f1b7e2e9917d5df",
+                                                                    "7b3d1230a174bb4bcc307a39ca570537582377af49e55a1ba1e5c4f58f739d52"
+                                                                ]
+                                },
+                                {
+                                    "id":  "GPU-003",
+                                    "source_execution_class":  "D_LAB_ONLY",
+                                    "execution_class":  "X_BLOCKED",
+                                    "normative_reason":  "Alterar power limit/limites termicos fica fora dos executores permitidos do GPU Center.",
+                                    "normative_source":  [
+                                                             "10_MODO_AVANCADO_SEGURO/01_MATRIZ_POLITICAS_AVANCADAS_SEGURAS.json",
+                                                             "04_PROMPT_PARA_IA/PROMPT_ATIVO_GOAT_TWEAKS.txt"
+                                                         ],
+                                    "normative_source_sha256":  [
+                                                                    "00866211cadf8a24270c81af39b1f78c4b7b53fca9ccc37d2f1b7e2e9917d5df",
+                                                                    "7b3d1230a174bb4bcc307a39ca570537582377af49e55a1ba1e5c4f58f739d52"
+                                                                ]
+                                },
+                                {
+                                    "id":  "GPU-004",
+                                    "source_execution_class":  "D_LAB_ONLY",
+                                    "execution_class":  "X_BLOCKED",
+                                    "normative_reason":  "Clock lock/OC fica fora dos executores permitidos do GPU Center.",
+                                    "normative_source":  [
+                                                             "10_MODO_AVANCADO_SEGURO/01_MATRIZ_POLITICAS_AVANCADAS_SEGURAS.json",
+                                                             "04_PROMPT_PARA_IA/PROMPT_ATIVO_GOAT_TWEAKS.txt"
+                                                         ],
+                                    "normative_source_sha256":  [
+                                                                    "00866211cadf8a24270c81af39b1f78c4b7b53fca9ccc37d2f1b7e2e9917d5df",
+                                                                    "7b3d1230a174bb4bcc307a39ca570537582377af49e55a1ba1e5c4f58f739d52"
+                                                                ]
+                                }
+                            ],
     "source_inconsistencies":  [
                                    "V7.3 complementary scope_note says 66 controls but controls has 73.",
                                    "Several legacy apply_mode=blocked records carry conditional automation text. X_BLOCKED wins during import.",
@@ -700,7 +923,8 @@
                                          "goat_decision",
                                          "recommendation",
                                          "source_ref"
-                                     ]
+                                     ],
+                         "cells_read":  945
                      },
                      {
                          "path":  "13_AUDITORIA_ARQUIVO_POR_ARQUIVO_RESETEXPLODE/03_AUDITORIA_TECNICA_MODULO_A_MODULO.md",

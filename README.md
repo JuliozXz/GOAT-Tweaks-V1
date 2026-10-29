@@ -1,12 +1,16 @@
-# GOAT Tweaks — 7.3.0 preview
+# GOAT Tweaks — 7.3.0
 
-Aplicativo novo, escrito do zero em **Windows PowerShell 5.1 e WPF**, a partir do pacote de requisitos V7.3 + GPU Center fornecido por Julio. Código, interface e motor próprios. A instrução direta do usuário para começar do zero prevaleceu sobre a orientação do pacote para continuar o aplicativo antigo.
+Versão oficial do aplicativo de diagnóstico e atendimento técnico, escrito em **Windows PowerShell 5.1 e WPF**, com código, interface e motor próprios. A especificação V7.3 + GPU Center foi incorporada como documentação rastreável; os módulos disponíveis e seus limites estão descritos na matriz funcional.
 
 O arquivo **`dist/GOAT-Tweaks.ps1` é independente**: inclui interface, módulos, 344 registros de catálogo e 64 documentos. Funciona sem baixar módulos, ferramentas, drivers ou scripts. Requer Windows 10/11 x64; não requer administração para diagnóstico.
 
 ![Interface GOAT Tweaks — dados de demonstração](docs/images/overview-demo.png)
 
 ## Abrir
+
+Abra a [release oficial v7.3.0](https://github.com/JuliozXz/GOAT-Tweaks-V1/releases/tag/v7.3.0), copie a única linha de `Open-GOAT.txt` e cole no PowerShell. Ela baixa o app da versão fixa, confere o SHA256 antes de executar, abre em Windows PowerShell 5.1 STA e remove somente o arquivo temporário criado quando o app fecha. Não é necessário instalar Git, GitHub CLI, winget ou módulos para abrir o aplicativo.
+
+O comando completo também fica em [dist/Open-GOAT.txt](dist/Open-GOAT.txt). O hash esperado está dentro da linha; divergência ou download interrompido bloqueiam a execução. A opção de execução usada pelo processo filho não altera a política de execução do Windows.
 
 Baixe o arquivo `dist/GOAT-Tweaks.ps1` e o checksum correspondente da mesma revisão. Confira o SHA256 antes de executar:
 
@@ -38,9 +42,9 @@ O PowerShell 7 relança o arquivo salvo usando Windows PowerShell 5.1. Para cont
 - Guias oficiais de driver e manutenção; DDU permanece manual e bloqueado em contexto remoto ou incerto. Nenhum instalador é executado pelo aplicativo.
 - Perfis por jogo com identificação, caminho autorizado, GPU confirmada, resolução/Hz, objetivo, Reflex, VRR, V-Sync, limite FPS e preservação de captura. Mostra conflitos e salva hipóteses locais, sem escrever perfis privados de driver.
 - Importação de frametimes CSV/PresentMon, FPS médio, 1% low com método declarado e p50/p95/p99. Comparação exige condições equivalentes e passes independentes. Input lag não é inferido dessas métricas.
-- Sessão persistente, prévia de ações, journal durável, read-back, rollback e recuperação por identidade do Windows/usuário. Duas preferências do Explorer têm executores em validação; aplicação real permanece bloqueada, com simulação em Demo.
+- Sessão persistente, revisão dos valores propostos, journal durável, read-back, rollback e recuperação por identidade do Windows/usuário. Duas preferências do Explorer têm executores em validação; aplicação real permanece bloqueada, com simulação em Demo. O inventário permanece em memória até autorizar seu registro local.
 - Relatório HTML para cliente, JSON/CSV, minimização de dados pessoais e pacote privado de reversão com script independente. Finalização valida os arquivos e preserva a recuperação; pode ser repetida.
-- Catálogo pesquisável com 344 requisitos e 64 documentos completos, fontes, hashes, riscos, classes, relações e textos originais. **344 requisitos catalogados não significam 344 ajustes implementados.** Os 41 bloqueios explícitos são preservados.
+- Catálogo pesquisável com 344 requisitos e 64 documentos completos, fontes, hashes, riscos, classes, relações e textos originais. **344 requisitos catalogados não significam 344 ajustes implementados.** Os 41 bloqueios originais são preservados e complementados pelas decisões normativas da revisão de release.
 
 Consulte [a matriz de funções](docs/FEATURE-MATRIX.md) e [a validação](docs/VALIDATION.md) para conhecer a cobertura real.
 
@@ -61,7 +65,7 @@ powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -File .\scripts\Build.ps1
 powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -File .\scripts\Test.ps1
 ```
 
-Saídas: `dist/GOAT-Tweaks.ps1`, `GOAT-Tweaks.sha256`, `build-manifest.json` e `GOAT-Tweaks-7.3.0-preview.zip`. O bundle ASCII contém recursos UTF-8 comprimidos em GZip e Base64, decodificados localmente em memória. O código legível está em `src/`. Não há execução de texto do catálogo ou dos prompts.
+Saídas: `dist/GOAT-Tweaks.ps1`, `GOAT-Tweaks.sha256`, `build-manifest.json`, `GOAT-Tweaks-7.3.0.zip`, `Open-GOAT.txt` e `launch.json`. A versão vem do arquivo `VERSION`. O bundle ASCII contém recursos UTF-8 comprimidos em GZip e Base64, decodificados localmente em memória. O código legível está em `src/`. Não há execução de texto do catálogo ou dos prompts.
 
 Os testes usam mocks de Registro/CIM e dados de captura sintéticos; a UI roda em Demo e exporta para diretório de teste. Nenhum tweak real é aplicado. Há testes reais de inventário somente leitura nesta máquina; isso não certifica outras versões do Windows ou GPUs.
 
@@ -71,8 +75,10 @@ Para regenerar os dados a partir do pacote original:
 powershell.exe -NoProfile -File .\scripts\Import-Specification.ps1 -SourceRoot 'D:\caminho\GOAT_TWEAKS_V7_3_PACOTE_MESTRE'
 ```
 
-## Limites da prévia
+## Escopo da versão oficial
 
-A matriz física Windows 10/11 + NVIDIA/AMD/Intel e os testes em VM de mutação permanecem pendentes; não há assinatura de distribuição. Por isso, os executores nativos não são liberados para aplicar ajustes reais. Sensores de temperatura, hotspot, clocks, potência e VRAM ficam indisponíveis sem provedor validado. Não há captura ETW, overlay injetado, OC, undervolt, BIOS/UEFI, MSI/HPET/BCD, desativação de segurança, remoção automática de drivers ou promessa de FPS.
+Esta release oficializa os fluxos implementados de diagnóstico, perfis consultivos, análise de capturas, catálogo, sessões e relatórios. A matriz física completa Windows 10/11 + NVIDIA/AMD/Intel e os testes em VM de mutação permanecem pendentes; o pacote não possui assinatura Authenticode de editor. Por isso, os executores nativos continuam sem liberação para aplicar ajustes reais. Sensores de temperatura, hotspot, clocks, potência e VRAM ficam indisponíveis sem provedor validado. Não há captura ETW, overlay injetado, OC, undervolt, BIOS/UEFI, MSI/HPET/BCD, desativação de segurança, remoção automática de drivers ou promessa de FPS.
+
+A revisão do pacote está em [docs/audit/RELEASE-REVIEW.md](docs/audit/RELEASE-REVIEW.md). A integridade da fonte documental não prova a eficácia de suas sugestões históricas. Correções e decisões atuais ficam registradas separadamente, preservando os documentos recebidos.
 
 O app é portátil: não instala serviço, helper, tarefa agendada nem inicialização automática. Finalizar preserva relatórios e snapshots; não apaga logs do Windows, dados de terceiros ou ferramentas de acesso remoto. Remover o arquivo do aplicativo não desfaz preferências persistentes previamente aprovadas.

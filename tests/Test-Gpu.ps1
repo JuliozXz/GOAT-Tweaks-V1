@@ -69,6 +69,8 @@ Assert-Gpu ($preview.Conflicts.Count -gt 0 -and ($preview.Recommendations -join 
 Assert-GpuThrows {New-GoatGpuGameProfile -GameId x -ExecutablePath 'C:\game.exe'} 'path requires authorization'
 Assert-GpuThrows {New-GoatGpuGameProfile -GameId x -ExecutablePath 'relative.exe' -AuthorizedPath} 'relative executable rejected'
 Assert-GpuThrows {New-GoatGpuGameProfile -GameId x -Resolution 'invalid'} 'invalid resolution rejected'
+Assert-GpuThrows {New-GoatGpuGameProfile -GameId x -Resolution '000x000'} 'zero dimensions rejected'
+Assert-GpuThrows {New-GoatGpuGameProfile -GameId ' '} 'blank game identity rejected'
 
 $taskDir=Join-Path ([IO.Path]::GetTempPath()) ('GOAT-GPU-Test-'+[guid]::NewGuid().ToString('N'))
 [IO.Directory]::CreateDirectory($taskDir)|Out-Null
@@ -82,6 +84,17 @@ try {
     Assert-Gpu ($saved.Status -eq 'SAVED_LOCAL_PROFILE' -and $loaded.GameId -eq $profile.GameId -and $saved.Sha256.Length -eq 64) 'local profile roundtrip with SHA256'
     Assert-GpuThrows {Save-GoatGpuGameProfile -Profile $profile -Path $path} 'profile export never overwrites existing file'
     Assert-GpuThrows {Save-GoatGpuGameProfile -Profile $profile -Path (Join-Path $taskDir 'wrong.json')} 'profile extension restricted'
+    foreach($invalid in @(@{Field='Id';Value='..\escape'},@{Field='Reflex';Value='Ultra'},@{Field='Goal';Value='FakeGoal'},@{Field='CaptureRequired';Value='false'},@{Field='WindowsSettingsChanged';Value='false'},@{Field='RefreshRateHz';Value='NaN'},@{Field='FpsCap';Value=-1},@{Field='CreatedUtc';Value='invalid'})){
+        $bad=$profile|ConvertTo-Json -Depth 8|ConvertFrom-Json;$bad.($invalid.Field)=$invalid.Value
+        $bad|ConvertTo-Json -Depth 8|Set-Content -LiteralPath $path -Encoding UTF8
+        Assert-GpuThrows {Import-GoatGpuGameProfile -Path $path} ('import validates profile field '+$invalid.Field)
+    }
+    $bad=$profile|ConvertTo-Json -Depth 8|ConvertFrom-Json;$bad|Add-Member OnImport 'throw "do not evaluate"'
+    $bad|ConvertTo-Json -Depth 8|Set-Content -LiteralPath $path -Encoding UTF8
+    Assert-GpuThrows {Import-GoatGpuGameProfile -Path $path} 'unknown imported executable instructions rejected as data'
+    $bad=$profile|ConvertTo-Json -Depth 8|ConvertFrom-Json;$bad.ExecutablePath='C:\fixture.exe';$bad.PathAuthorized=$false
+    $bad|ConvertTo-Json -Depth 8|Set-Content -LiteralPath $path -Encoding UTF8
+    Assert-GpuThrows {Import-GoatGpuGameProfile -Path $path} 'imported executable metadata still requires authorized path flag'
     $loaded.WindowsSettingsChanged=$true;$loaded|ConvertTo-Json -Depth 8|Set-Content -LiteralPath $path -Encoding UTF8
     Assert-GpuThrows {Import-GoatGpuGameProfile -Path $path} 'tampered profile claiming Windows mutation rejected'
 } finally {

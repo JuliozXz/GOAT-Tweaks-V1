@@ -1,16 +1,51 @@
 {
   "date_local": "2026-10-28",
   "timezone": "America/Sao_Paulo",
+  "version": "7.3.0",
+  "channel": "Official",
   "engine": "Windows PowerShell 5.1 x64 STA",
-  "suites_passed": 8,
+  "suites_passed": 10,
   "suites_failed": 0,
-  "assertions": 3192,
-  "suite_assertions": { "Benchmark": 48, "Catalog": 2923, "Core": 39, "Gpu": 32, "Inventory": 34, "Presentation": 23, "Reports": 22, "UI": 71 },
-  "bundled_ui_assertions_passed": 71,
+  "assertions": 3753,
+  "suite_assertions": {
+    "Benchmark": 66,
+    "Catalog": 3322,
+    "Core": 56,
+    "Gpu": 44,
+    "Inventory": 45,
+    "Launch": 33,
+    "Presentation": 23,
+    "Release": 47,
+    "Reports": 36,
+    "UI": 81
+  },
+  "bundled_ui_assertions_passed": 81,
+  "real_readonly_ui_assertions_passed": 23,
   "navigation_pages": 16,
-  "bundle_sha256": "2df92fec1391574820e3712960b72be2a47772965f61a0a62b21e2232e383e6f",
-  "real_readonly_observation": { "os_build": 19045, "gpu_vendors": ["NVIDIA"], "gpu_count": 1, "monitor_count": 1, "storage_reliability": "UNAVAILABLE" },
+  "catalog_records": 344,
+  "original_blocks": 41,
+  "effective_blocks": 50,
+  "normative_overrides": 9,
+  "bundle_sha256": "aeaf79c6ba490b0078a0f515a28a8e6817169483b3ae51f871cdbaff2b1d0fa2",
+  "real_readonly_observation": {
+    "os_build": 19045,
+    "storage_reliability": "UNAVAILABLE",
+    "gpu_count": 1,
+    "monitor_count": 1,
+    "gpu_vendors": [
+      "NVIDIA"
+    ]
+  },
   "real_windows_preferences_modified": false,
-  "pending": ["Windows 11 physical", "AMD physical", "Intel physical", "Mutation and rollback on disposable systems", "Remote failure recovery on physical systems", "Accessibility and DPI matrix", "Publisher signing"],
-  "scope": "Fixtures, WPF Demo workflow, bundled workflow, and one physical Windows read-only inventory. Not performance or hardware certification."
+  "pending": [
+    "Windows 11 physical",
+    "AMD physical",
+    "Intel physical",
+    "Mutation and rollback on disposable systems",
+    "Physical remote failure recovery",
+    "Full screen-reader and DPI matrix",
+    "Publisher signing",
+    "Large capture load testing"
+  ],
+  "scope": "Official distribution of implemented read-only diagnostics, profiles, capture analysis, session, recovery infrastructure, catalog and reporting. Not a claim of 344 automated tweaks or hardware certification."
 }

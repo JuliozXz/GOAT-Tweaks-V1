@@ -34,6 +34,24 @@ try {
     $script:ActiveSession=New-GoatSession -Root $root
     $session=$script:ActiveSession
     Assert-Core ([IO.File]::Exists((Join-Path $session.Root 'session.json'))) 'session saved with unique ownership'
+    $session.Inventory=[pscustomobject]@{PrivateFixture='DO-NOT-PERSIST'};Save-GoatSession $session
+    $storedSession=Get-Content -LiteralPath (Join-Path $session.Root 'session.json') -Raw -Encoding UTF8|ConvertFrom-Json
+    Assert-Core ($null -eq $storedSession.Inventory -and $session.Inventory.PrivateFixture -eq 'DO-NOT-PERSIST') 'inventory stays in UI memory without persistence consent'
+    $session.Consent=$true;Save-GoatSession $session
+    $storedSession=Get-Content -LiteralPath (Join-Path $session.Root 'session.json') -Raw -Encoding UTF8|ConvertFrom-Json
+    Assert-Core ($storedSession.Inventory.PrivateFixture -eq 'DO-NOT-PERSIST') 'inventory persisted only with explicit boolean consent'
+    $loaded=Import-GoatSession -Path (Join-Path $session.Root 'session.json') -Demo:$false
+    Assert-Core ($loaded.Id -eq $session.Id -and $loaded.Root -eq $session.Root) 'session loader validates and canonicalizes the actual session directory'
+    Assert-CoreThrows {Import-GoatSession -Path (Join-Path $session.Root 'session.json') -Demo} 'session loader cannot silently convert real session to Demo'
+    $storedSession.Consent=$false;Write-GoatJson $storedSession (Join-Path $session.Root 'session.json')
+    $loaded=Import-GoatSession -Path (Join-Path $session.Root 'session.json')
+    Assert-Core ($null -eq $loaded.Inventory -and $loaded.RuntimeWarnings.Count -gt 0) 'loader discards legacy inventory stored without consent'
+    $storedSession.State='Finalizing';$storedSession.FinalExport=$null;Write-GoatJson $storedSession (Join-Path $session.Root 'session.json')
+    $loaded=Import-GoatSession -Path (Join-Path $session.Root 'session.json')
+    Assert-Core ($loaded.State -eq 'Open' -and $loaded.RuntimeWarnings.Count -gt 0) 'interrupted finalization without valid export reopens for review'
+    $storedSession.State='ExecuteAnything';Write-GoatJson $storedSession (Join-Path $session.Root 'session.json')
+    Assert-CoreThrows {Import-GoatSession -Path (Join-Path $session.Root 'session.json')} 'session loader rejects unknown state'
+    Save-GoatSession $session
     $preview=@(Get-GoatActionPreview -Session $session -Ids explorer-show-extensions)
     Assert-Core ($preview.Count -eq 1 -and $preview[0].Changed -and -not $preview[0].Before.Exists -and $preview[0].Proposed.Data -eq 0) 'preview preserves absence and shows proposed DWORD'
     Assert-Core ($script:FixtureWrites.Count -eq 0) 'preview has no registry writes'
@@ -49,12 +67,29 @@ try {
     $disk=@(Get-GoatTransactions $session)[0]
     Assert-Core ($transaction.State -eq 'Applied' -and $disk.State -eq 'Applied' -and $disk.Steps[0].State -eq 'Applied') 'batch durable and verified'
     Assert-Core (-not $disk.Steps[0].Original.Exists -and $disk.Steps[0].Target.Hive -eq 'CurrentUser' -and $disk.Steps[0].Target.View -eq 'Registry64') 'snapshot preserves hive view and absence'
+    Assert-Core ($disk.Steps[0].SnapshotSha256 -eq (Get-GoatSnapshotHash $disk.Steps[0])) 'exact snapshot hash persists and verifies'
+    $altered=Copy-FixtureState $disk;$altered.Steps[0].Original.Exists=$true;$altered.Steps[0].Original.Kind='String';$altered.Steps[0].Original.Data='ALTERED'
+    Assert-CoreThrows {Assert-GoatTransaction $altered $script:FixtureIdentity} 'modified original data cannot pass snapshot integrity'
+    $altered=Copy-FixtureState $disk;$altered.Steps[0].State='EXECUTE_SCRIPT'
+    Assert-CoreThrows {Assert-GoatTransaction $altered $script:FixtureIdentity} 'unknown journal step cannot skip recovery with false restored state'
+    $altered=Copy-FixtureState $disk;$altered.Steps[0].Original.Exists='false'
+    Assert-CoreThrows {Assert-GoatTransaction $altered $script:FixtureIdentity} 'presence flag string cannot masquerade as snapshot boolean'
     Assert-CoreThrows {Restore-GoatTransaction $session $transaction.Id} 'restore requires consent'
     Restore-GoatTransaction $session $transaction.Id -Consent|Out-Null
     Assert-Core (-not (Read-GoatRegistry $script:FixtureActions[0]).Exists) 'restore original absence does not set opposite preference'
     $writeCount=$script:FixtureWrites.Count
     Restore-GoatTransaction $session $transaction.Id -Consent|Out-Null
     Assert-Core ($script:FixtureWrites.Count -eq $writeCount) 'restoration idempotent'
+    $configured=[pscustomobject]@{KeyExists=$true;Exists=$true;Kind='DWord';Data=0};$script:FixtureRegistry['explorer-show-extensions']=Copy-FixtureState $configured
+    $writeCount=$script:FixtureWrites.Count;$unchanged=Invoke-GoatActionBatch -Session $session -Ids explorer-show-extensions -Consent
+    Assert-Core ($unchanged.Steps[0].State -eq 'Unchanged' -and $script:FixtureWrites.Count -eq $writeCount) 'already configured preference records no-op without a registry write'
+    Restore-GoatTransaction $session $unchanged.Id -Consent|Out-Null
+    Assert-Core ($script:FixtureWrites.Count -eq $writeCount) 'restoring no-op never overwrites the unchanged original'
+    $drift=Invoke-GoatActionBatch -Session $session -Ids explorer-show-extensions -Direction Off -Consent
+    $script:FixtureRegistry['explorer-show-extensions'].Data=99;$writeCount=$script:FixtureWrites.Count
+    Assert-CoreThrows {Restore-GoatTransaction $session $drift.Id -Consent} 'external state drift requires review before explicit restoration'
+    Assert-Core ($script:FixtureWrites.Count -eq $writeCount) 'drifted value is preserved rather than overwritten'
+    $script:FixtureRegistry['explorer-show-extensions'].Data=1;Restore-GoatTransaction $session $drift.Id -Consent|Out-Null
 
     foreach($fixture in @(@('String','original'),@('ExpandString','%USERPROFILE%\fixture'),@('MultiString',@('a','b')),@('Binary',@([byte]0,[byte]255)),@('QWord',[long]4294967296),@('DWord',-2147483648))) {
         $original=[pscustomobject]@{KeyExists=$true;Exists=$true;Kind=$fixture[0];Data=$fixture[1]}
@@ -115,12 +150,16 @@ try {
     $script:ActiveSession=$session;Restore-GoatTransaction $session $older.Id -Consent|Out-Null
     $malformed=Join-Path $session.Root 'transactions\malformed.json';[IO.File]::WriteAllText($malformed,'{broken')
     Assert-CoreThrows {Invoke-GoatActionBatch -Session $session -Ids explorer-show-hidden -Consent} 'malformed journal blocks new action'
+    [IO.File]::SetAttributes($malformed,[IO.FileAttributes]::Hidden)
+    Assert-CoreThrows {Invoke-GoatActionBatch -Session $session -Ids explorer-show-hidden -Consent} 'hidden malformed journal cannot disappear from recovery gate'
     [IO.File]::Delete($malformed)
     $demo=New-GoatSession -Demo -Root $root
     $writes=$script:FixtureWrites.Count;$demoTx=Invoke-GoatActionBatch -Session $demo -Ids explorer-show-hidden -Consent
     Assert-Core ($demoTx.State -eq 'DEMO' -and $writes -eq $script:FixtureWrites.Count -and @(Get-GoatTransactions $demo).Count -eq 0) 'demo has no mutation or recovery journal'
     $demo.State='Finalized'
     Assert-CoreThrows {Get-GoatActionPreview $demo @('explorer-show-hidden')} 'finalized session blocks new preview and action'
+    $session.State='Finalized';Save-GoatSession $session;$session.State='Open'
+    Assert-CoreThrows {Get-GoatActionPreview $session @('explorer-show-hidden')} 'stale in-memory model cannot reopen a finalized persisted session'
 } finally {
     $full=[IO.Path]::GetFullPath($root)
     if(-not $full.StartsWith([IO.Path]::GetFullPath([IO.Path]::GetTempPath()),[StringComparison]::OrdinalIgnoreCase) -or (Split-Path $full -Leaf) -notlike 'GOAT-Core-Test-*'){throw 'Unsafe fixture cleanup'}

@@ -1,50 +1,63 @@
 {
-    "Version":  "7.3.0-preview",
-    "BundleSha256":  "2df92fec1391574820e3712960b72be2a47772965f61a0a62b21e2232e383e6f",
+    "Version":  "7.3.0",
+    "Channel":  "Official",
+    "BundleSha256":  "aeaf79c6ba490b0078a0f515a28a8e6817169483b3ae51f871cdbaff2b1d0fa2",
     "Sources":  [
                     {
                         "Path":  "src/Core.ps1",
-                        "Sha256":  "70190EBCE0372E76DCF747EE05D0AEB3A5BC757686B9BF6DD6F284D1CA0B5AE4"
+                        "Sha256":  "7D298167CF79CAB31B26575BC3A1E94F9D106893BD54D20AEBB60F64B8AA072F"
                     },
                     {
                         "Path":  "src/Gpu.ps1",
-                        "Sha256":  "16DE968817C28386B91B4CF0357C5E55760405EA99F2020D060725A72D171C17"
+                        "Sha256":  "2F07C2CD68A33B81D94DB16F2D185FB6D9D6573DE46C5A3044F5FE1591ADC272"
                     },
                     {
                         "Path":  "src/Inventory.ps1",
-                        "Sha256":  "5A269E23A9A42968C914EF1FD45739AE89244EDB2F4F5265F2382DD124474B29"
+                        "Sha256":  "6053B3AD52452941F8079600890E8674C10136B8FDC0B1038F96B103AB011B91"
                     },
                     {
                         "Path":  "src/Benchmark.ps1",
-                        "Sha256":  "4C292F072849D7A6A39FFEBCB336FAE1DD283E2B48179704830F37B87C0D6E72"
+                        "Sha256":  "EEA53008BAA24E49A361B27913B77B19406E9556C60FE62F99D942FA3551AA49"
                     },
                     {
                         "Path":  "src/Reports.ps1",
-                        "Sha256":  "19FE501695D3B400F4DAC49F1505836860FE2B136C328A158009BD8CD93A8A77"
+                        "Sha256":  "391CF974A488E1E014219DA7515928E56588D43187CAE0ECD1D301EAF5D5F104"
                     },
                     {
                         "Path":  "src/Presentation.ps1",
-                        "Sha256":  "9971AF49E756E23034B96903875437CB4F08B98F80B1D1328E60E3AE314D599C"
+                        "Sha256":  "0ED8FD5FBF68A027D2A5BC2C01802E27AFDD1CE0276BA0492FB5E839C1DD81FD"
                     },
                     {
                         "Path":  "src/App.ps1",
-                        "Sha256":  "8AEBF237EAD815575968101B1B8B948EA84E2B012C9A80415B545F9B9F944C72"
+                        "Sha256":  "BFE066FD01FFFC9ECA609568F7AB7D578ED26A3E9541BCED070F330B338B950E"
                     },
                     {
                         "Path":  "src/UI.xaml",
-                        "Sha256":  "B897FF7724BBA27F44CF7B407F85C730717927D1AA77AC288C5F15603EB17016"
+                        "Sha256":  "FE350EA7500D5B44A8F85865AE3F7CB512F8BB648DB4DE22B125F0831713221F"
                     },
                     {
                         "Path":  "data/catalog.json",
-                        "Sha256":  "57E7647CC967B93D24F4EF46C2BFEC31E4B5FB166704EEDBFE87781903F3A797"
+                        "Sha256":  "1FAA7430AC08BC564B8C3EF471DA633E75A0E9577809747B148FADDBEDE4DC55"
                     },
                     {
                         "Path":  "data/documents.json",
-                        "Sha256":  "3CD6969E3217247BEA7EBD70B44D42A86E0DE72FBF6D726853EC17A7F71CEE8B"
+                        "Sha256":  "6C117C4BBA3DB02CA4F7EEECF91D5071481303365ED54DE8E5F02B6D7E555364"
                     },
                     {
                         "Path":  "src/Entry.ps1",
                         "Sha256":  "9532F5DF75AA726944650D90C03FCFA6DA2775F453956FAECF6388E5F10E8544"
+                    },
+                    {
+                        "Path":  "VERSION",
+                        "Sha256":  "9E79064C749A37B2C33696623F132B91C29B5E941413DBFB13FA7851E2A53143"
+                    },
+                    {
+                        "Path":  "scripts/Build.ps1",
+                        "Sha256":  "29A545F8CE1D3B65323347CAE123F936C456AD3437AB4A35762157EEF7BFBF54"
+                    },
+                    {
+                        "Path":  "scripts/New-LaunchCommand.ps1",
+                        "Sha256":  "B12E68388D715D91CDAA429D9495251FE74B57CFCA961F9C9A285FC25CA05678"
                     }
                 ]
 }

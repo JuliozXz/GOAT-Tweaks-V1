@@ -39,6 +39,52 @@ try {
     Assert-True ($capture.RawFrameTimesMs.Count -eq 100) 'raw samples retained'
     Assert-True ($capture.Source.PSObject.Properties.Name -notcontains 'FullPath') 'personal directory path omitted'
     Assert-Near $capture.Metrics.AverageFps 100 'CSV metrics match supplied frames'
+    $originalBytes=[IO.File]::ReadAllBytes($path)
+    $originalHash=(Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()
+    $snapshotPath=Join-Path $temp 'preserved/source-snapshot.csv'
+    $preserved=Import-GoatFrameCapture -Path $path -Conditions $conditions -SnapshotPath $snapshotPath
+    Assert-True ($preserved.Source.SnapshotStatus -eq 'SAVED_AND_HASH_VERIFIED') 'explicit snapshot reports verified bytes'
+    Assert-True ($preserved.Source.SnapshotFileName -eq 'source-snapshot.csv') 'snapshot metadata contains file name only'
+    Assert-True ((Get-FileHash -LiteralPath $snapshotPath -Algorithm SHA256).Hash.ToLowerInvariant() -eq $originalHash) 'saved original and reported hash derive from identical bytes'
+    Assert-True ($preserved.Source.Sha256 -eq $originalHash -and $preserved.Metrics.AverageFps -eq 100) 'metrics and provenance refer to the same snapshot'
+    Assert-Throws {Import-GoatFrameCapture -Path $path -Conditions $conditions -SnapshotPath $snapshotPath} 'existing snapshot is never overwritten'
+    Assert-True ((Get-FileHash -LiteralPath $snapshotPath -Algorithm SHA256).Hash.ToLowerInvariant() -eq $originalHash) 'collision preserves previous snapshot'
+    Assert-Throws {Import-GoatFrameCapture -Path $path -Conditions $conditions -SnapshotPath $path} 'snapshot cannot overwrite source'
+    $lockedSnapshotPath=Join-Path $temp 'locked-source-copy.csv'
+    $writer=[IO.File]::Open($path,[IO.FileMode]::Open,[IO.FileAccess]::ReadWrite,[IO.FileShare]::ReadWrite)
+    try{Assert-Throws {Import-GoatFrameCapture -Path $path -Conditions $conditions -SnapshotPath $lockedSnapshotPath} 'active writer blocks importing an unfinished capture'}finally{$writer.Dispose()}
+    Assert-True (-not [IO.File]::Exists($lockedSnapshotPath)) 'unfinished source never produces a claimed snapshot'
+    # Simulate a source replacement immediately after the single byte read. All
+    # parsing, hashing and saving must still describe the original snapshot.
+    $script:SavedReadSource=(Get-Command Read-GoatFrameSource).ScriptBlock
+    function Read-GoatFrameSource {
+        param([string]$Path)
+        $snapshot=& $script:SavedReadSource -Path $Path
+        [IO.File]::WriteAllText($Path,$snapshot.Text.Replace(',10',',20'))
+        $snapshot
+    }
+    try {
+        $racedPath=Join-Path $temp 'preserved/replaced-source.csv'
+        $raced=Import-GoatFrameCapture -Path $path -Conditions $conditions -SnapshotPath $racedPath
+        Assert-True ((Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant() -ne $raced.Source.Sha256) 'fixture replaced the source after snapshot read'
+        Assert-True ($raced.Source.Sha256 -eq $originalHash -and $raced.Metrics.AverageFps -eq 100) 'source replacement cannot change parsed metrics or provenance'
+        Assert-True ((Get-FileHash -LiteralPath $racedPath -Algorithm SHA256).Hash.ToLowerInvariant() -eq $originalHash) 'saved source remains exactly the analyzed bytes despite replacement'
+    }finally{Set-Item function:Read-GoatFrameSource -Value $script:SavedReadSource;[IO.File]::WriteAllBytes($path,$originalBytes)}
+    $bomPath=Join-Path $temp 'bom.csv'
+    $bomBytes=[byte[]](@([byte]239,[byte]187,[byte]191)+@($originalBytes))
+    [IO.File]::WriteAllBytes($bomPath,$bomBytes)
+    $bomSnapshot=Join-Path $temp 'preserved/bom-snapshot.csv'
+    $bomCapture=Import-GoatFrameCapture -Path $bomPath -Conditions $conditions -SnapshotPath $bomSnapshot
+    Assert-True ($bomCapture.Metrics.AverageFps -eq 100) 'UTF8 BOM is decoded for CSV parsing'
+    Assert-True ((Get-FileHash -LiteralPath $bomSnapshot -Algorithm SHA256).Hash -eq (Get-FileHash -LiteralPath $bomPath -Algorithm SHA256).Hash) 'BOM bytes are preserved in provenance and snapshot'
+    $invalidPath=Join-Path $temp 'invalid-snapshot-source.csv'
+    [IO.File]::WriteAllText($invalidPath,"FrameTimeMs`nNaN")
+    $invalidSnapshot=Join-Path $temp 'invalid-snapshot.csv'
+    Assert-Throws {Import-GoatFrameCapture -Path $invalidPath -Conditions $conditions -SnapshotPath $invalidSnapshot} 'invalid source cannot be persisted as a valid capture'
+    Assert-True (-not [IO.File]::Exists($invalidSnapshot)) 'validation failure creates no snapshot'
+    $failedSnapshot=Join-Path $temp 'failed-hash-snapshot.csv'
+    Assert-Throws {Write-GoatCaptureSnapshot -Bytes $originalBytes -Path $failedSnapshot -ExpectedSha256 ('0'*64)} 'snapshot read-back mismatch is surfaced'
+    Assert-True (-not [IO.File]::Exists($failedSnapshot)) 'an unverified partial snapshot is never exposed as a final CSV'
     $selected = Import-GoatFrameCapture -Path $path -Conditions $conditions -ProcessId 42
     Assert-True ($selected.Source.RowsImported -eq 100) 'explicit PID selection works'
     Assert-Throws { Import-GoatFrameCapture -Path $path -Conditions $conditions -ProcessId 99 } 'missing PID rejected'

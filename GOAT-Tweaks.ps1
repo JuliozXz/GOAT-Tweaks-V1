@@ -2,6 +2,7 @@
 [CmdletBinding()]
 param([switch]$Demo,[switch]$ScanOnly,[string]$DataRoot,[string]$SessionPath)
 $script:GoatLaunchPath=$PSCommandPath
+$script:GoatVersion=(Get-Content -LiteralPath (Join-Path $PSScriptRoot 'VERSION') -Raw -Encoding UTF8).Trim()
 $script:GoatSources=@{}
 foreach($name in @('Core','Gpu','Inventory','Benchmark','Reports','Presentation','App')){
     $script:GoatSources[$name]=Get-Content -LiteralPath (Join-Path $PSScriptRoot ('src\'+$name+'.ps1')) -Raw -Encoding UTF8
